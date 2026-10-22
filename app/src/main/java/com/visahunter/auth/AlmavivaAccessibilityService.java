@@ -1,10 +1,14 @@
 package com.visahunter.auth;
 
 import android.accessibilityservice.AccessibilityService;
+import android.accessibilityservice.GestureDescription;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.graphics.Path;
+import android.graphics.Rect;
+import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
@@ -78,6 +82,15 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
         Log.i(TAG, "AlmavivaAccessibilityService connected successfully");
         startPolling();
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        stopPolling();
+        instance = null;
+        updateState(false, "تم إيقاف الخدمة");
+        Log.i(TAG, "AlmavivaAccessibilityService unbound");
+        return super.onUnbind(intent);
     }
 
     @Override
@@ -312,14 +325,32 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
     private boolean performClickHierarchy(AccessibilityNodeInfo node) {
         if (node == null) return false;
-        if (node.isClickable()) {
-            return node.performAction(AccessibilityNodeInfo.ACTION_CLICK);
+        if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            return true;
         }
         AccessibilityNodeInfo parent = node.getParent();
         if (parent != null) {
             boolean res = performClickHierarchy(parent);
             parent.recycle();
-            return res;
+            if (res) return true;
+        }
+        return clickByGesture(node);
+    }
+
+    private boolean clickByGesture(AccessibilityNodeInfo node) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Rect rect = new Rect();
+            node.getBoundsInScreen(rect);
+            if (!rect.isEmpty() && rect.centerX() > 0 && rect.centerY() > 0) {
+                Path clickPath = new Path();
+                clickPath.moveTo(rect.centerX(), rect.centerY());
+                GestureDescription.StrokeDescription stroke =
+                        new GestureDescription.StrokeDescription(clickPath, 0, 50);
+                GestureDescription.Builder builder = new GestureDescription.Builder();
+                builder.addStroke(stroke);
+                Log.i(TAG, "Executing gesture click at (" + rect.centerX() + ", " + rect.centerY() + ")");
+                return dispatchGesture(builder.build(), null, null);
+            }
         }
         return false;
     }

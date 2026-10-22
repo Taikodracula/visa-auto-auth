@@ -1,9 +1,12 @@
 package com.visahunter.auth;
 
+import android.content.ComponentName;
+import android.content.Context;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.text.TextUtils;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -77,7 +80,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void updateAccessibilityUI() {
-        boolean isRunning = AlmavivaAccessibilityService.isRunning();
+        boolean isRunning = AlmavivaAccessibilityService.isRunning() || isAccessibilityServiceEnabled(this, AlmavivaAccessibilityService.class);
         if (isRunning) {
             tvAccessibilityStatus.setText("🟢 مفعل وجاهز");
             tvAccessibilityStatus.setTextColor(ContextCompat.getColor(this, R.color.success_green));
@@ -101,6 +104,25 @@ public class MainActivity extends AppCompatActivity {
                 tvRestrictedSettingsHelp.setVisibility(View.VISIBLE);
             }
         }
+    }
+
+    public static boolean isAccessibilityServiceEnabled(Context context, Class<?> service) {
+        ComponentName expectedComponentName = new ComponentName(context, service);
+        String enabledServicesSetting = Settings.Secure.getString(
+                context.getContentResolver(),
+                Settings.Secure.ENABLED_ACCESSIBILITY_SERVICES
+        );
+        if (enabledServicesSetting == null) return false;
+        TextUtils.SimpleStringSplitter colonSplitter = new TextUtils.SimpleStringSplitter(':');
+        colonSplitter.setString(enabledServicesSetting);
+        while (colonSplitter.hasNext()) {
+            String componentNameString = colonSplitter.next();
+            ComponentName enabledService = ComponentName.unflattenFromString(componentNameString);
+            if (enabledService != null && enabledService.equals(expectedComponentName)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private void openAccessibilitySettings() {
