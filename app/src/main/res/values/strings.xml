@@ -1,0 +1,5 @@
+<resources>
+    <string name="app_name">مساعد تأشيرات المافيفا</string>
+    <string name="app_name_en">Visa Auto-Auth</string>
+    <string name="accessibility_service_desc">خدمة النقر التلقائي لتأكيد رموز التحقق MFA لتطبيق المافيفا وحجز المواعيد آلياً.</string>
+</resources>
