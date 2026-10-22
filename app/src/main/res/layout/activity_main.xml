@@ -127,6 +127,19 @@
             android:textStyle="bold"
             app:backgroundTint="@null" />
 
+        <!-- Restricted Setting Helper (Android 13/14) -->
+        <TextView
+            android:id="@+id/tv_restricted_settings_help"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginTop="10dp"
+            android:padding="6dp"
+            android:text="🔒 ظهرت لك رسالة 'الإعداد محظور'؟ اضغط هنا لحلها"
+            android:textColor="@color/primary_cyan"
+            android:textSize="12sp"
+            android:textStyle="bold" />
+
         <!-- Settings Card -->
         <LinearLayout
             android:layout_width="match_parent"

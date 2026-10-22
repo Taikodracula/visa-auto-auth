@@ -1,13 +1,16 @@
 package com.visahunter.auth;
 
 import android.content.Intent;
+import android.net.Uri;
 import android.os.Bundle;
 import android.provider.Settings;
+import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.ContextCompat;
 
@@ -16,6 +19,7 @@ public class MainActivity extends AppCompatActivity {
     private TextView tvAccessibilityStatus;
     private TextView tvServerStatus;
     private Button btnEnableAccessibility;
+    private TextView tvRestrictedSettingsHelp;
     private EditText etClientEmail;
     private EditText etServerUrl;
     private Button btnSaveConnect;
@@ -34,6 +38,7 @@ public class MainActivity extends AppCompatActivity {
         tvAccessibilityStatus = findViewById(R.id.tv_accessibility_status);
         tvServerStatus = findViewById(R.id.tv_server_status);
         btnEnableAccessibility = findViewById(R.id.btn_enable_accessibility);
+        tvRestrictedSettingsHelp = findViewById(R.id.tv_restricted_settings_help);
         etClientEmail = findViewById(R.id.et_client_email);
         etServerUrl = findViewById(R.id.et_server_url);
         btnSaveConnect = findViewById(R.id.btn_save_connect);
@@ -46,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
 
         // Button listeners
         btnEnableAccessibility.setOnClickListener(v -> openAccessibilitySettings());
+        tvRestrictedSettingsHelp.setOnClickListener(v -> showRestrictedSettingsGuide());
         btnSaveConnect.setOnClickListener(v -> saveAndConnect());
         btnTestClick.setOnClickListener(v -> runTestClick());
 
@@ -80,6 +86,9 @@ public class MainActivity extends AppCompatActivity {
             btnEnableAccessibility.setBackgroundResource(R.drawable.card_bg);
             btnEnableAccessibility.setTextColor(ContextCompat.getColor(this, R.color.success_green));
             btnEnableAccessibility.setEnabled(false);
+            if (tvRestrictedSettingsHelp != null) {
+                tvRestrictedSettingsHelp.setVisibility(View.GONE);
+            }
         } else {
             tvAccessibilityStatus.setText("❌ غير مفعل");
             tvAccessibilityStatus.setTextColor(ContextCompat.getColor(this, R.color.error_red));
@@ -88,6 +97,9 @@ public class MainActivity extends AppCompatActivity {
             btnEnableAccessibility.setBackgroundResource(R.drawable.btn_primary);
             btnEnableAccessibility.setTextColor(ContextCompat.getColor(this, R.color.bg_dark));
             btnEnableAccessibility.setEnabled(true);
+            if (tvRestrictedSettingsHelp != null) {
+                tvRestrictedSettingsHelp.setVisibility(View.VISIBLE);
+            }
         }
     }
 
@@ -99,6 +111,27 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Toast.makeText(this, "تعذر فتح الإعدادات: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
+    }
+
+    private void showRestrictedSettingsGuide() {
+        new AlertDialog.Builder(this)
+                .setTitle("🔓 فك حظر الإعداد (أندرويد 13 و 14)")
+                .setMessage("لحماية هاتفك، يطلب أندرويد إذناً يدوياً لتطبيقات الطرف الخارجي:\n\n" +
+                        "1️⃣ اضغط على (فتح معلومات التطبيق) بالأسفل.\n" +
+                        "2️⃣ اضغط على الـ 3 نقاط (⋮) في أعلى الزاوية.\n" +
+                        "3️⃣ اختر 'السماح بالإعدادات المقيدة'.\n" +
+                        "4️⃣ أكد بصمتك ثم عد للتطبيق وفعل إذن النقر بنجاح!")
+                .setPositiveButton("فتح معلومات التطبيق", (dialog, which) -> {
+                    try {
+                        Intent intent = new Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS);
+                        intent.setData(Uri.parse("package:" + getPackageName()));
+                        startActivity(intent);
+                    } catch (Exception e) {
+                        Toast.makeText(this, "تعذر فتح معلومات التطبيق: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .setNegativeButton("إغلاق", null)
+                .show();
     }
 
     private void saveAndConnect() {
