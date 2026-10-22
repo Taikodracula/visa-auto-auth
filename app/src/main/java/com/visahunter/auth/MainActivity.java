@@ -192,9 +192,10 @@ public class MainActivity extends AppCompatActivity {
         }
 
         if (url.isEmpty()) {
-            etServerUrl.setError("يرجى إدخال عنوان السيرفر");
-            etServerUrl.requestFocus();
-            return;
+            url = preferences.getServerUrl();
+        }
+        if (url == null || url.isEmpty()) {
+            url = "http://164.132.41.46:3003";
         }
 
         preferences.setClientEmail(email);

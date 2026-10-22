@@ -256,7 +256,8 @@
                 android:layout_marginTop="10dp"
                 android:text="عنوان سيرفر المواعيد (Host/IP):"
                 android:textColor="@color/text_muted"
-                android:textSize="12sp" />
+                android:textSize="12sp"
+                android:visibility="gone" />
 
             <EditText
                 android:id="@+id/et_server_url"
@@ -270,7 +271,8 @@
                 android:paddingEnd="12dp"
                 android:textColor="@color/text_white"
                 android:textColorHint="#475569"
-                android:textSize="14sp" />
+                android:textSize="14sp"
+                android:visibility="gone" />
 
             <Button
                 android:id="@+id/btn_save_connect"
@@ -284,7 +286,7 @@
                 app:backgroundTint="@null" />
         </LinearLayout>
 
-        <!-- Actions & Tests -->
+        <!-- Actions & Tests (Hidden for clean client UX) -->
         <Button
             android:id="@+id/btn_test_click"
             style="@style/Widget.MaterialComponents.Button.OutlinedButton"
@@ -294,6 +296,7 @@
             android:text="🧪 فحص وتجربة النقر التلقائي على المافيفا"
             android:textColor="@color/primary_cyan"
             android:textSize="13sp"
+            android:visibility="gone"
             app:strokeColor="@color/primary_cyan" />
 
         <Button
@@ -305,6 +308,7 @@
             android:text="📸 فحص وتجربة التقاط الشاشة محلياً"
             android:textColor="@color/primary_cyan"
             android:textSize="13sp"
+            android:visibility="gone"
             app:strokeColor="@color/primary_cyan" />
 
         <!-- Log Card -->
