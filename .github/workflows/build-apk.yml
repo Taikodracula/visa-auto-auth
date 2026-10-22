@@ -34,15 +34,19 @@ jobs:
       - name: Generate Official Gradle Wrapper
         run: gradle wrapper --gradle-version 8.5
 
-      - name: Build Debug APK
+      - name: Generate Release Keystore
+        run: |
+          keytool -genkeypair -v -keystore app/release.keystore -alias visahunter -keyalg RSA -keysize 2048 -validity 10000 -storepass visahunter123 -keypass visahunter123 -dname "CN=VisaHunter, OU=Dev, O=VisaHunter, L=Cairo, C=EG"
+
+      - name: Build Signed Release APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleDebug --no-daemon --stacktrace
+          ./gradlew assembleRelease --no-daemon --stacktrace
 
       - name: Rename APK for release
         run: |
           mkdir -p release-output
-          cp app/build/outputs/apk/debug/app-debug.apk release-output/VisaAutoAuth-v1.0.apk || cp app/build/outputs/apk/debug/*.apk release-output/VisaAutoAuth-v1.0.apk
+          cp app/build/outputs/apk/release/app-release.apk release-output/VisaAutoAuth-v1.0.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4

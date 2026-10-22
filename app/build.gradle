@@ -8,21 +8,33 @@ android {
 
     defaultConfig {
         applicationId "com.visahunter.auth"
-        minSdk 24
-        targetSdk 34
-        versionCode 1
-        versionName "1.0.0"
+        minSdk 21
+        targetSdk 33
+        versionCode 2
+        versionName "1.0.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            storeFile file('release.keystore')
+            storePassword 'visahunter123'
+            keyAlias 'visahunter'
+            keyPassword 'visahunter123'
+            v1SigningEnabled true
+            v2SigningEnabled true
+        }
+    }
+
     buildTypes {
         release {
+            signingConfig signingConfigs.release
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {
-            applicationIdSuffix ""
+            signingConfig signingConfigs.release
             debuggable true
         }
     }
