@@ -41,7 +41,7 @@ jobs:
       - name: Build Signed Release APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease -x lint -x lintVitalRelease -x test --no-daemon --stacktrace 2>&1 | tee build.log || true
+          ./gradlew assembleRelease --no-daemon --stacktrace 2>&1 | tee build.log || true
           mkdir -p release-output
           if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
             echo "BUILD_FAILED=true" >> $GITHUB_ENV
