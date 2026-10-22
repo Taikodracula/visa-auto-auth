@@ -18,6 +18,8 @@ import android.view.accessibility.AccessibilityNodeInfo;
 import org.json.JSONObject;
 
 import java.net.URLEncoder;
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
@@ -280,7 +282,10 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             switch (currentStep) {
                 case 1:
                     // Step 1: Click "امسح رمز الاستجابة السريعة"
-                    stepSuccess = findAndClickSmart(root, "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة", "Scan QR", "مسح رمز");
+                    stepSuccess = findAndClickSmart(root, true, "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false, "امسح رمز الاستجابة السريعة", "Scan QR");
+                    }
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 1 SUCCESS] Clicked Scan QR Code");
                         currentStep = 2;
@@ -290,19 +295,25 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                     break;
 
                 case 2:
-                    // Step 2: Click "الصق القيمة المنسوخة"
-                    stepSuccess = findAndClickSmart(root, "الصق القيمة المنسوخة", "لصق القيمة المنسوخة", "الصق", "Paste");
+                    // Step 2: Click "الصق القيمة المنسوخة" (strictly prefer exact match and bottom button to avoid top subtext)
+                    stepSuccess = findAndClickSmart(root, true, "الصق القيمة المنسوخة", "لصق القيمة المنسوخة");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false, "الصق القيمة المنسوخة");
+                    }
                     if (stepSuccess) {
-                        Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value");
+                        Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value button");
                         currentStep = 3;
-                        handler.postDelayed(stepLoopRunnable, 1200);
+                        handler.postDelayed(stepLoopRunnable, 1500);
                         return;
                     }
                     break;
 
                 case 3:
                     // Step 3: Click "تأكيد"
-                    stepSuccess = findAndClickSmart(root, "تأكيد", "تاكيد", "Confirm");
+                    stepSuccess = findAndClickSmart(root, true, "تأكيد", "تاكيد", "Confirm");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false, "تأكيد", "Confirm");
+                    }
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 3 SUCCESS] Clicked Confirm");
                         currentStep = 4;
@@ -313,7 +324,10 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
                 case 4:
                     // Step 4: Click "حسناً"
-                    stepSuccess = findAndClickSmart(root, "حسناً", "حسنا", "OK", "Ok", "تم");
+                    stepSuccess = findAndClickSmart(root, true, "حسناً", "حسنا", "OK", "Ok", "تم");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false, "حسناً", "حسنا", "OK", "تم");
+                    }
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 4 SUCCESS] Clicked OK");
                         currentStep = 5;
@@ -338,63 +352,102 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         }
     }
 
-    private boolean findAndClickSmart(AccessibilityNodeInfo root, String... keywords) {
+    private boolean findAndClickSmart(AccessibilityNodeInfo root, boolean requireExactMatch, String... keywords) {
         if (root == null) return false;
 
-        // 1. Direct text search
-        for (String kw : keywords) {
-            List<AccessibilityNodeInfo> list = root.findAccessibilityNodeInfosByText(kw);
-            if (list != null && !list.isEmpty()) {
-                for (AccessibilityNodeInfo node : list) {
-                    if (clickNodeSmart(node)) {
-                        node.recycle();
-                        return true;
-                    }
-                    node.recycle();
-                }
+        List<AccessibilityNodeInfo> candidates = new ArrayList<>();
+        findMatchingNodes(root, candidates, requireExactMatch, keywords);
+
+        if (candidates.isEmpty()) {
+            return false;
+        }
+
+        // Sort candidates:
+        // 1. Exact match first
+        // 2. Clickable first
+        // 3. Lowest on screen first (higher Y coordinate)
+        Collections.sort(candidates, (n1, n2) -> {
+            boolean ex1 = matchesExact(n1, keywords);
+            boolean ex2 = matchesExact(n2, keywords);
+            if (ex1 != ex2) {
+                return ex1 ? -1 : 1;
+            }
+
+            boolean clk1 = n1.isClickable() || (n1.getParent() != null && n1.getParent().isClickable());
+            boolean clk2 = n2.isClickable() || (n2.getParent() != null && n2.getParent().isClickable());
+            if (clk1 != clk2) {
+                return clk1 ? -1 : 1;
+            }
+
+            Rect r1 = new Rect();
+            Rect r2 = new Rect();
+            n1.getBoundsInScreen(r1);
+            n2.getBoundsInScreen(r2);
+            return Integer.compare(r2.centerY(), r1.centerY());
+        });
+
+        for (AccessibilityNodeInfo candidate : candidates) {
+            Rect r = new Rect();
+            candidate.getBoundsInScreen(r);
+            Log.i(TAG, "Attempting candidate '" + candidate.getText() + "' at center (" + r.centerX() + ", " + r.centerY() + ")");
+            if (clickNodeSmart(candidate)) {
+                for (AccessibilityNodeInfo n : candidates) n.recycle();
+                return true;
             }
         }
 
-        // 2. Recursive search
-        AccessibilityNodeInfo matched = findNodeRecursive(root, keywords);
-        if (matched != null) {
-            boolean res = clickNodeSmart(matched);
-            matched.recycle();
-            return res;
-        }
-
+        for (AccessibilityNodeInfo n : candidates) n.recycle();
         return false;
     }
 
-    private AccessibilityNodeInfo findNodeRecursive(AccessibilityNodeInfo node, String... keywords) {
-        if (node == null) return null;
+    private void findMatchingNodes(AccessibilityNodeInfo node, List<AccessibilityNodeInfo> result, boolean requireExact, String... keywords) {
+        if (node == null) return;
 
         CharSequence text = node.getText();
         CharSequence desc = node.getContentDescription();
 
-        for (String kw : keywords) {
-            String lowerKw = kw.toLowerCase().trim();
-            if (text != null && text.toString().toLowerCase().contains(lowerKw)) {
-                return node;
+        boolean matched = false;
+        if (requireExact) {
+            matched = matchesExact(node, keywords);
+        } else {
+            for (String kw : keywords) {
+                String lKw = kw.toLowerCase().trim();
+                if ((text != null && text.toString().toLowerCase().contains(lKw)) ||
+                    (desc != null && desc.toString().toLowerCase().contains(lKw))) {
+                    matched = true;
+                    break;
+                }
             }
-            if (desc != null && desc.toString().toLowerCase().contains(lowerKw)) {
-                return node;
-            }
+        }
+
+        if (matched) {
+            result.add(AccessibilityNodeInfo.obtain(node));
         }
 
         int count = node.getChildCount();
         for (int i = 0; i < count; i++) {
             AccessibilityNodeInfo child = node.getChild(i);
             if (child != null) {
-                AccessibilityNodeInfo found = findNodeRecursive(child, keywords);
-                if (found != null) {
-                    if (found != child) child.recycle();
-                    return found;
-                }
+                findMatchingNodes(child, result, requireExact, keywords);
                 child.recycle();
             }
         }
-        return null;
+    }
+
+    private boolean matchesExact(AccessibilityNodeInfo node, String... keywords) {
+        if (node == null) return false;
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+        for (String kw : keywords) {
+            String lKw = kw.trim();
+            if (text != null && text.toString().trim().equalsIgnoreCase(lKw)) {
+                return true;
+            }
+            if (desc != null && desc.toString().trim().equalsIgnoreCase(lKw)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     private boolean clickNodeSmart(AccessibilityNodeInfo node) {
@@ -405,7 +458,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
         // 1. Try ACTION_CLICK on node
         if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            Log.i(TAG, "Clicked node via ACTION_CLICK");
+            Log.i(TAG, "Clicked node via ACTION_CLICK at (" + rect.centerX() + ", " + rect.centerY() + ")");
             return true;
         }
 
@@ -413,7 +466,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         AccessibilityNodeInfo current = node.getParent();
         for (int i = 0; i < 4 && current != null; i++) {
             if (current.isClickable() && current.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-                Log.i(TAG, "Clicked parent level " + i + " via ACTION_CLICK");
+                Log.i(TAG, "Clicked parent level " + i + " via ACTION_CLICK at (" + rect.centerX() + ", " + rect.centerY() + ")");
                 current.recycle();
                 return true;
             }
