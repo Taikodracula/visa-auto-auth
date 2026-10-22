@@ -264,7 +264,7 @@
                 android:layout_height="46dp"
                 android:layout_marginTop="4dp"
                 android:background="@drawable/card_bg"
-                android:hint="http://192.168.1.100:3003"
+                android:hint="http://164.132.41.46:3003"
                 android:inputType="textUri"
                 android:paddingStart="12dp"
                 android:paddingEnd="12dp"
