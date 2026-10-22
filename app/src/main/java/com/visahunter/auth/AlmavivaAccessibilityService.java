@@ -2,6 +2,7 @@ package com.visahunter.auth;
 
 import android.accessibilityservice.AccessibilityService;
 import android.accessibilityservice.GestureDescription;
+import android.annotation.TargetApi;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -31,6 +32,8 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.concurrent.Executor;
+import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
 import okhttp3.MediaType;
@@ -662,10 +665,12 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         } catch (Exception ignored) {}
     }
 
+    @TargetApi(Build.VERSION_CODES.R)
     public void takeAndUploadScreenshot(String serverUrl, String email) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
             try {
-                takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new AccessibilityService.TakeScreenshotCallback() {
+                Executor executor = Executors.newSingleThreadExecutor();
+                takeScreenshot(Display.DEFAULT_DISPLAY, executor, new AccessibilityService.TakeScreenshotCallback() {
                     @Override
                     public void onSuccess(AccessibilityService.ScreenshotResult screenshotResult) {
                         try {
