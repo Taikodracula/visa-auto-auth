@@ -19,7 +19,7 @@ public class AppPreferences {
     }
 
     public String getServerUrl() {
-        return prefs.getString(KEY_SERVER_URL, "http://192.168.1.1:3003");
+        return prefs.getString(KEY_SERVER_URL, "http://192.168.1.3:3003");
     }
 
     public void setClientEmail(String email) {

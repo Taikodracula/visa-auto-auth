@@ -208,18 +208,18 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         // 2. Launch Almaviva app
         try {
             Intent launchIntent = getPackageManager().getLaunchIntentForPackage(ALMAVIVA_PACKAGE);
-            if (launchIntent != null) {
-                launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
-                startActivity(launchIntent);
-                Log.i(TAG, "Almaviva app launched");
-            } else {
-                Log.e(TAG, "Almaviva package (" + ALMAVIVA_PACKAGE + ") not found!");
-                finishAutomation(false, "تطبيق المافيفا غير مثبت على الهاتف", callback);
-                return;
+            if (launchIntent == null) {
+                Log.w(TAG, "getLaunchIntentForPackage returned null, trying fallback intent");
+                launchIntent = new Intent(Intent.ACTION_MAIN);
+                launchIntent.addCategory(Intent.CATEGORY_LAUNCHER);
+                launchIntent.setPackage(ALMAVIVA_PACKAGE);
             }
+            launchIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+            startActivity(launchIntent);
+            Log.i(TAG, "Almaviva app launched");
         } catch (Exception e) {
             Log.e(TAG, "Error launching Almaviva: " + e.getMessage());
-            finishAutomation(false, "فشل تشغيل تطبيق المافيفا: " + e.getMessage(), callback);
+            finishAutomation(false, "تعذر تشغيل تطبيق المافيفا: " + e.getMessage(), callback);
             return;
         }
 
