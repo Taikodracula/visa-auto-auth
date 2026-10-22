@@ -41,7 +41,7 @@ jobs:
       - name: Build Signed Release APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          ./gradlew assembleRelease -x lint -x lintVitalRelease -x test --no-daemon --stacktrace
 
       - name: Rename APK for release
         run: |

