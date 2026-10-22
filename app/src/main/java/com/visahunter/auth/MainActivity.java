@@ -1,11 +1,7 @@
 package com.visahunter.auth;
 
-import android.content.Context;
 import android.content.Intent;
-import android.net.Uri;
-import android.os.Build;
 import android.os.Bundle;
-import android.os.PowerManager;
 import android.provider.Settings;
 import android.widget.Button;
 import android.widget.EditText;
@@ -23,7 +19,6 @@ public class MainActivity extends AppCompatActivity {
     private EditText etClientEmail;
     private EditText etServerUrl;
     private Button btnSaveConnect;
-    private Button btnBatteryOpt;
     private Button btnTestClick;
     private TextView tvLog;
 
@@ -42,7 +37,6 @@ public class MainActivity extends AppCompatActivity {
         etClientEmail = findViewById(R.id.et_client_email);
         etServerUrl = findViewById(R.id.et_server_url);
         btnSaveConnect = findViewById(R.id.btn_save_connect);
-        btnBatteryOpt = findViewById(R.id.btn_battery_opt);
         btnTestClick = findViewById(R.id.btn_test_click);
         tvLog = findViewById(R.id.tv_log);
 
@@ -50,17 +44,13 @@ public class MainActivity extends AppCompatActivity {
         etClientEmail.setText(preferences.getClientEmail());
         etServerUrl.setText(preferences.getServerUrl());
 
-        // Buttons listeners
+        // Button listeners
         btnEnableAccessibility.setOnClickListener(v -> openAccessibilitySettings());
-
-        btnSaveConnect.setOnClickListener(v -> saveAndStartService());
-
-        btnBatteryOpt.setOnClickListener(v -> requestIgnoreBatteryOptimization());
-
+        btnSaveConnect.setOnClickListener(v -> saveAndConnect());
         btnTestClick.setOnClickListener(v -> runTestClick());
 
-        // State listener from polling service
-        ClientPollService.setStateListener((connected, log) -> runOnUiThread(() -> {
+        // State listener from Accessibility Service
+        AlmavivaAccessibilityService.setStateListener((connected, log) -> runOnUiThread(() -> {
             if (connected) {
                 tvServerStatus.setText("🟢 متصل بالسيرفر");
                 tvServerStatus.setTextColor(ContextCompat.getColor(this, R.color.success_green));
@@ -72,11 +62,6 @@ public class MainActivity extends AppCompatActivity {
                 tvLog.setText(log);
             }
         }));
-
-        // Automatically start service if config is present
-        if (!preferences.getClientEmail().isEmpty() && !preferences.getServerUrl().isEmpty()) {
-            startPollService();
-        }
     }
 
     @Override
@@ -116,7 +101,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void saveAndStartService() {
+    private void saveAndConnect() {
         String email = etClientEmail.getText().toString().trim();
         String url = etServerUrl.getText().toString().trim();
 
@@ -135,38 +120,12 @@ public class MainActivity extends AppCompatActivity {
         preferences.setClientEmail(email);
         preferences.setServerUrl(url);
 
-        Toast.makeText(this, "💾 تم حفظ البيانات وبدء الاتصال...", Toast.LENGTH_SHORT).show();
-        startPollService();
-    }
+        Toast.makeText(this, "💾 تم حفظ البيانات!", Toast.LENGTH_SHORT).show();
 
-    private void startPollService() {
-        Intent serviceIntent = new Intent(this, ClientPollService.class);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            startForegroundService(serviceIntent);
+        if (AlmavivaAccessibilityService.isRunning()) {
+            AlmavivaAccessibilityService.getInstance().restartPolling();
         } else {
-            startService(serviceIntent);
-        }
-    }
-
-    private void requestIgnoreBatteryOptimization() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            try {
-                PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-                if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
-                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
-                    intent.setData(Uri.parse("package:" + getPackageName()));
-                    startActivity(intent);
-                } else {
-                    Toast.makeText(this, "✅ استثناء البطارية مفعل بالفعل!", Toast.LENGTH_SHORT).show();
-                }
-            } catch (Exception e) {
-                try {
-                    Intent intent = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
-                    startActivity(intent);
-                } catch (Exception ex) {
-                    Toast.makeText(this, "افتح إعدادات البطارية وقم باستثناء التطبيق", Toast.LENGTH_SHORT).show();
-                }
-            }
+            Toast.makeText(this, "⚠️ يرجى تفعيل إذن النقر التلقائي لبدء الاتصال بالسيرفر", Toast.LENGTH_LONG).show();
         }
     }
 
