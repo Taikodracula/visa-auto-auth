@@ -103,12 +103,6 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
     }
 
     @Override
-    public void onAccessibilityEvent(AccessibilityEvent event) {
-        if (!isAutomating) return;
-        handler.post(this::evaluateCurrentStep);
-    }
-
-    @Override
     public void onInterrupt() {
         isAutomating = false;
         Log.w(TAG, "AlmavivaAccessibilityService interrupted");
@@ -206,6 +200,16 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         }
     }
 
+    private AutomationCallback activeCallback;
+    private final Runnable stepLoopRunnable = this::runStepLoop;
+
+    @Override
+    public void onAccessibilityEvent(AccessibilityEvent event) {
+        if (!isAutomating) return;
+        handler.removeCallbacks(stepLoopRunnable);
+        handler.post(stepLoopRunnable);
+    }
+
     public synchronized void startMfaAutomation(String qrText, AutomationCallback callback) {
         if (isAutomating) {
             Log.w(TAG, "Automation already in progress, aborting previous");
@@ -214,6 +218,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
         isAutomating = true;
         currentStep = 1;
+        this.activeCallback = callback;
 
         Log.i(TAG, "Starting MFA automation for Almaviva...");
 
@@ -247,83 +252,101 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             return;
         }
 
-        // 3. Safety timeout (25 seconds)
+        // 3. Safety timeout (35 seconds)
         timeoutRunnable = () -> {
             if (isAutomating) {
                 Log.w(TAG, "Automation timed out at step " + currentStep);
                 performGlobalAction(GLOBAL_ACTION_HOME);
-                finishAutomation(false, "انتهت المهلة قبل إتمام جميع النقرات", callback);
+                finishAutomation(false, "انتهت المهلة قبل إتمام جميع النقرات (خطوة " + currentStep + ")", activeCallback);
             }
         };
-        handler.postDelayed(timeoutRunnable, 25000);
+        handler.postDelayed(timeoutRunnable, 35000);
 
-        // Schedule first check after 1.5s
-        handler.postDelayed(() -> evaluateCurrentStepWithCallback(callback), 1500);
+        // 4. Start active step loop after 800ms
+        handler.postDelayed(stepLoopRunnable, 800);
     }
 
-    private synchronized void evaluateCurrentStepWithCallback(AutomationCallback callback) {
+    private synchronized void runStepLoop() {
         if (!isAutomating) return;
 
         AccessibilityNodeInfo root = getRootInActiveWindow();
-        if (root == null) return;
+        if (root == null) {
+            handler.postDelayed(stepLoopRunnable, 350);
+            return;
+        }
 
         try {
+            boolean stepSuccess = false;
             switch (currentStep) {
                 case 1:
-                    if (findAndClick(root, "امسح رمز الاستجابة السريعة", "مسح رمز الاستجابة السريعة", "Scan QR code", "امسح رمز")) {
-                        Log.i(TAG, "Step 1 Completed: Clicked Scan QR Code");
+                    // Step 1: Click "امسح رمز الاستجابة السريعة"
+                    stepSuccess = findAndClickSmart(root, "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة", "Scan QR", "مسح رمز");
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 1 SUCCESS] Clicked Scan QR Code");
                         currentStep = 2;
-                        handler.postDelayed(() -> evaluateCurrentStepWithCallback(callback), 1000);
+                        handler.postDelayed(stepLoopRunnable, 1200);
+                        return;
                     }
                     break;
 
                 case 2:
-                    if (findAndClick(root, "الصق القيمة المنسوخة", "لصق القيمة المنسوخة", "Paste copied value", "الصق")) {
-                        Log.i(TAG, "Step 2 Completed: Clicked Paste Copied Value");
+                    // Step 2: Click "الصق القيمة المنسوخة"
+                    stepSuccess = findAndClickSmart(root, "الصق القيمة المنسوخة", "لصق القيمة المنسوخة", "الصق", "Paste");
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value");
                         currentStep = 3;
-                        handler.postDelayed(() -> evaluateCurrentStepWithCallback(callback), 1000);
+                        handler.postDelayed(stepLoopRunnable, 1200);
+                        return;
                     }
                     break;
 
                 case 3:
-                    if (findAndClick(root, "تأكيد", "تاكيد", "Confirm")) {
-                        Log.i(TAG, "Step 3 Completed: Clicked Confirm");
+                    // Step 3: Click "تأكيد"
+                    stepSuccess = findAndClickSmart(root, "تأكيد", "تاكيد", "Confirm");
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 3 SUCCESS] Clicked Confirm");
                         currentStep = 4;
-                        handler.postDelayed(() -> evaluateCurrentStepWithCallback(callback), 2500);
+                        handler.postDelayed(stepLoopRunnable, 2200);
+                        return;
                     }
                     break;
 
                 case 4:
-                    if (findAndClick(root, "حسناً", "حسنا", "OK", "Ok", "تم")) {
-                        Log.i(TAG, "Step 4 Completed: Clicked OK");
+                    // Step 4: Click "حسناً"
+                    stepSuccess = findAndClickSmart(root, "حسناً", "حسنا", "OK", "Ok", "تم");
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 4 SUCCESS] Clicked OK");
                         currentStep = 5;
-                        handler.postDelayed(() -> evaluateCurrentStepWithCallback(callback), 1000);
+                        handler.postDelayed(stepLoopRunnable, 1000);
+                        return;
                     }
                     break;
 
                 case 5:
-                    Log.i(TAG, "Step 5: Returning to home screen");
+                    // Step 5: Finished, go Home
+                    Log.i(TAG, "✅ [STEP 5 SUCCESS] Returning to Home Screen");
                     performGlobalAction(GLOBAL_ACTION_HOME);
-                    finishAutomation(true, "تم تأكيد الرمز والموافقة بنجاح 100%", callback);
-                    break;
+                    finishAutomation(true, "تم تأكيد الرمز والموافقة بنجاح 100%", activeCallback);
+                    return;
             }
+
+            // Not found yet on this frame -> keep polling every 350ms
+            handler.postDelayed(stepLoopRunnable, 350);
+
         } finally {
             root.recycle();
         }
     }
 
-    private void evaluateCurrentStep() {
-        // Window change trigger
-        evaluateCurrentStepWithCallback(null);
-    }
-
-    private boolean findAndClick(AccessibilityNodeInfo root, String... texts) {
+    private boolean findAndClickSmart(AccessibilityNodeInfo root, String... keywords) {
         if (root == null) return false;
-        for (String target : texts) {
-            List<AccessibilityNodeInfo> nodes = root.findAccessibilityNodeInfosByText(target);
-            if (nodes != null && !nodes.isEmpty()) {
-                for (AccessibilityNodeInfo node : nodes) {
-                    if (performClickHierarchy(node)) {
+
+        // 1. Direct text search
+        for (String kw : keywords) {
+            List<AccessibilityNodeInfo> list = root.findAccessibilityNodeInfosByText(kw);
+            if (list != null && !list.isEmpty()) {
+                for (AccessibilityNodeInfo node : list) {
+                    if (clickNodeSmart(node)) {
                         node.recycle();
                         return true;
                     }
@@ -331,37 +354,92 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 }
             }
         }
+
+        // 2. Recursive search
+        AccessibilityNodeInfo matched = findNodeRecursive(root, keywords);
+        if (matched != null) {
+            boolean res = clickNodeSmart(matched);
+            matched.recycle();
+            return res;
+        }
+
         return false;
     }
 
-    private boolean performClickHierarchy(AccessibilityNodeInfo node) {
-        if (node == null) return false;
-        if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
-            return true;
+    private AccessibilityNodeInfo findNodeRecursive(AccessibilityNodeInfo node, String... keywords) {
+        if (node == null) return null;
+
+        CharSequence text = node.getText();
+        CharSequence desc = node.getContentDescription();
+
+        for (String kw : keywords) {
+            String lowerKw = kw.toLowerCase().trim();
+            if (text != null && text.toString().toLowerCase().contains(lowerKw)) {
+                return node;
+            }
+            if (desc != null && desc.toString().toLowerCase().contains(lowerKw)) {
+                return node;
+            }
         }
-        AccessibilityNodeInfo parent = node.getParent();
-        if (parent != null) {
-            boolean res = performClickHierarchy(parent);
-            parent.recycle();
-            if (res) return true;
+
+        int count = node.getChildCount();
+        for (int i = 0; i < count; i++) {
+            AccessibilityNodeInfo child = node.getChild(i);
+            if (child != null) {
+                AccessibilityNodeInfo found = findNodeRecursive(child, keywords);
+                if (found != null) {
+                    if (found != child) child.recycle();
+                    return found;
+                }
+                child.recycle();
+            }
         }
-        return clickByGesture(node);
+        return null;
     }
 
-    private boolean clickByGesture(AccessibilityNodeInfo node) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-            Rect rect = new Rect();
-            node.getBoundsInScreen(rect);
-            if (!rect.isEmpty() && rect.centerX() > 0 && rect.centerY() > 0) {
-                Path clickPath = new Path();
-                clickPath.moveTo(rect.centerX(), rect.centerY());
-                GestureDescription.StrokeDescription stroke =
-                        new GestureDescription.StrokeDescription(clickPath, 0, 50);
-                GestureDescription.Builder builder = new GestureDescription.Builder();
-                builder.addStroke(stroke);
-                Log.i(TAG, "Executing gesture click at (" + rect.centerX() + ", " + rect.centerY() + ")");
-                return dispatchGesture(builder.build(), null, null);
+    private boolean clickNodeSmart(AccessibilityNodeInfo node) {
+        if (node == null) return false;
+
+        Rect rect = new Rect();
+        node.getBoundsInScreen(rect);
+
+        // 1. Try ACTION_CLICK on node
+        if (node.isClickable() && node.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+            Log.i(TAG, "Clicked node via ACTION_CLICK");
+            return true;
+        }
+
+        // 2. Try parents (up to 4 levels)
+        AccessibilityNodeInfo current = node.getParent();
+        for (int i = 0; i < 4 && current != null; i++) {
+            if (current.isClickable() && current.performAction(AccessibilityNodeInfo.ACTION_CLICK)) {
+                Log.i(TAG, "Clicked parent level " + i + " via ACTION_CLICK");
+                current.recycle();
+                return true;
             }
+            AccessibilityNodeInfo next = current.getParent();
+            current.recycle();
+            current = next;
+        }
+
+        // 3. Fallback: Dispatch Touch Gesture at screen coordinates (MacroDroid style)
+        if (!rect.isEmpty() && rect.centerX() > 0 && rect.centerY() > 0) {
+            Log.i(TAG, "Dispatching Gesture Click at (" + rect.centerX() + ", " + rect.centerY() + ")");
+            return clickByCoordinates(rect.centerX(), rect.centerY());
+        }
+
+        return false;
+    }
+
+    private boolean clickByCoordinates(float x, float y) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            Path clickPath = new Path();
+            clickPath.moveTo(x, y);
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(clickPath, 0, 75);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(stroke);
+            return dispatchGesture(builder.build(), null, null);
         }
         return false;
     }
@@ -369,6 +447,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
     private synchronized void finishAutomation(boolean success, String message, AutomationCallback callback) {
         isAutomating = false;
         currentStep = 0;
+        handler.removeCallbacks(stepLoopRunnable);
         if (timeoutRunnable != null) {
             handler.removeCallbacks(timeoutRunnable);
             timeoutRunnable = null;
@@ -376,15 +455,18 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         if (callback != null) {
             callback.onCompleted(success, message);
         }
+        this.activeCallback = null;
     }
 
     public synchronized void cancelAutomation() {
         isAutomating = false;
         currentStep = 0;
+        handler.removeCallbacks(stepLoopRunnable);
         if (timeoutRunnable != null) {
             handler.removeCallbacks(timeoutRunnable);
             timeoutRunnable = null;
         }
+        this.activeCallback = null;
     }
 
     private void sendAck(String serverUrl, String email, String challengeId, boolean success, String message) {
