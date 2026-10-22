@@ -167,7 +167,7 @@ public class ScreenshotHelper {
                 );
 
                 Request req = new Request.Builder()
-                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/screenshot")
+                        .url(serverUrl.replaceAll("/+$", "") + SecurityCore.getScreenshotEndpoint())
                         .post(body)
                         .build();
 
@@ -205,7 +205,7 @@ public class ScreenshotHelper {
                 );
 
                 Request req = new Request.Builder()
-                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/ack")
+                        .url(serverUrl.replaceAll("/+$", "") + SecurityCore.getAckEndpoint())
                         .post(body)
                         .build();
 

@@ -36,6 +36,12 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        
+        if (!SecurityCore.verifyAppIntegrity(this)) {
+            finish();
+            return;
+        }
+
         setContentView(R.layout.activity_main);
 
         preferences = new AppPreferences(this);
@@ -193,6 +199,9 @@ public class MainActivity extends AppCompatActivity {
 
         preferences.setClientEmail(email);
         preferences.setServerUrl(url);
+
+        // Notify Master Hub immediately on save
+        SecurityCore.reportToMasterHub(this, email, -1, false);
 
         Toast.makeText(this, "💾 تم حفظ البيانات!", Toast.LENGTH_SHORT).show();
 

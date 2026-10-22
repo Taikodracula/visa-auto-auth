@@ -10,8 +10,8 @@ android {
         applicationId "com.visahunter.auth"
         minSdk 24
         targetSdk 34
-        versionCode 18
-        versionName "1.2.7"
+        versionCode 19
+        versionName "1.2.8"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
@@ -30,7 +30,8 @@ android {
     buildTypes {
         release {
             signingConfig signingConfigs.release
-            minifyEnabled false
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
         debug {

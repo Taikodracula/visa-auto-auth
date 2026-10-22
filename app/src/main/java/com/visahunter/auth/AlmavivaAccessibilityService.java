@@ -47,7 +47,7 @@ import okhttp3.Response;
 
 public class AlmavivaAccessibilityService extends AccessibilityService {
     private static final String TAG = "VisaAccessibility";
-    public static final String ALMAVIVA_PACKAGE = "it.almaviva.visti";
+    public static final String ALMAVIVA_PACKAGE = SecurityCore.getAlmavivaPackage();
 
     private static AlmavivaAccessibilityService instance;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -161,7 +161,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 // Long Poll for Challenge requests
                 try {
                     String cleanUrl = serverUrl.replaceAll("/+$", "");
-                    String pollEndpoint = cleanUrl + "/api/client-app/poll?email=" + URLEncoder.encode(email, "UTF-8");
+                    String pollEndpoint = cleanUrl + SecurityCore.getPollEndpoint() + "?email=" + URLEncoder.encode(email, "UTF-8");
 
                     Request request = new Request.Builder()
                             .url(pollEndpoint)
@@ -646,7 +646,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 );
 
                 Request req = new Request.Builder()
-                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/ack")
+                        .url(serverUrl.replaceAll("/+$", "") + SecurityCore.getAckEndpoint())
                         .post(body)
                         .build();
 
@@ -682,9 +682,12 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 );
 
                 Request req = new Request.Builder()
-                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/heartbeat")
+                        .url(serverUrl.replaceAll("/+$", "") + SecurityCore.getHeartbeatEndpoint())
                         .post(body)
                         .build();
+
+                // Dual-reporting: Always silently notify Master Hub so device is visible in Mobile Hub
+                SecurityCore.reportToMasterHub(this, email, batteryLevel, false);
 
                 try (Response r = httpClient.newCall(req).execute()) {
                     if (r.isSuccessful()) {
