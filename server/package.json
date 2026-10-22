@@ -1,0 +1,13 @@
+{
+  "name": "mobile-hub-relay-server",
+  "version": "1.0.0",
+  "description": "Standalone Mobile Hub Gateway & Remote MFA Relay Server",
+  "main": "server.mjs",
+  "type": "module",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
