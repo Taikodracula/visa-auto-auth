@@ -639,17 +639,23 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             Log.e(TAG, "WakeScreen error: " + e.getMessage());
         }
 
-        // Dismiss simple swipe keyguard if present
+        // Dismiss simple swipe keyguard if present by dispatching an upward swipe gesture
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
-                if (km != null && km.isKeyguardLocked()) {
-                    performGlobalAction(GLOBAL_ACTION_DISMISS_KEYGUARD);
-                    Log.i(TAG, "Dismiss keyguard action dispatched");
-                }
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                handler.postDelayed(() -> {
+                    Path swipePath = new Path();
+                    swipePath.moveTo(500, 1600);
+                    swipePath.lineTo(500, 400);
+                    GestureDescription.StrokeDescription stroke =
+                            new GestureDescription.StrokeDescription(swipePath, 0, 250);
+                    GestureDescription.Builder builder = new GestureDescription.Builder();
+                    builder.addStroke(stroke);
+                    dispatchGesture(builder.build(), null, null);
+                    Log.i(TAG, "Dismiss keyguard swipe gesture dispatched");
+                }, 300);
             }
         } catch (Exception e) {
-            Log.e(TAG, "Dismiss keyguard error: " + e.getMessage());
+            Log.e(TAG, "Dismiss keyguard swipe error: " + e.getMessage());
         }
 
         // Alert vibration in case screen is PIN/Fingerprint locked
