@@ -185,9 +185,38 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 });
                             } else if ("CAPTURE_SCREEN".equals(action)) {
                                 Log.i(TAG, "Server requested screenshot capture");
-                                wakeScreenAndDismissKeyguard();
-                                updateState(true, "📸 تم التقاط شاشة الهاتف للمعاينة المباشرة");
+                                wakeScreenIfNeeded();
+                                updateState(true, "📸 جاري تصوير الشاشة وإرسالها للوحة التحكم...");
                                 takeAndUploadScreenshot(cleanUrl, email);
+                            } else if ("OPEN_ALMAVIVA".equals(action)) {
+                                Log.i(TAG, "Server requested open Almaviva");
+                                wakeScreenAndDismissKeyguard();
+                                updateState(true, "🚀 جاري تشغيل تطبيق المافيفا عن بعد...");
+                                try {
+                                    Intent li = getPackageManager().getLaunchIntentForPackage(ALMAVIVA_PACKAGE);
+                                    if (li == null) {
+                                        li = new Intent(Intent.ACTION_MAIN);
+                                        li.addCategory(Intent.CATEGORY_LAUNCHER);
+                                        li.setPackage(ALMAVIVA_PACKAGE);
+                                    }
+                                    li.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+                                    startActivity(li);
+                                    sendAck(cleanUrl, email, "REMOTE", true, "تم تشغيل تطبيق المافيفا عن بعد");
+                                    handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 2000);
+                                } catch (Exception e) {
+                                    Log.e(TAG, "Failed to launch Almaviva: " + e.getMessage());
+                                    sendAck(cleanUrl, email, "REMOTE", false, "تعذر تشغيل المافيفا: " + e.getMessage());
+                                }
+                            } else if ("GO_HOME".equals(action)) {
+                                Log.i(TAG, "Server requested go home");
+                                performGlobalAction(GLOBAL_ACTION_HOME);
+                                sendAck(cleanUrl, email, "REMOTE", true, "تم العودة للشاشة الرئيسية");
+                                handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 1000);
+                            } else if ("WAKE_SCREEN".equals(action)) {
+                                Log.i(TAG, "Server requested wake screen");
+                                wakeScreenAndDismissKeyguard();
+                                sendAck(cleanUrl, email, "REMOTE", true, "تم إيقاظ شاشة الهاتف");
+                                handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 1000);
                             } else if ("TEST_ALMAVIVA".equals(action)) {
                                 Log.i(TAG, "Server requested test click sequence");
                                 wakeScreenAndDismissKeyguard();
@@ -197,6 +226,22 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                     sendAck(cleanUrl, email, "TEST", success, message);
                                     handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 1500);
                                 });
+                            } else if ("VIBRATE_ALERT".equals(action)) {
+                                Log.i(TAG, "Server requested vibrate alert");
+                                wakeScreenIfNeeded();
+                                try {
+                                    Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                    if (v != null && v.hasVibrator()) {
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            v.vibrate(VibrationEffect.createWaveform(new long[]{0, 300, 150, 300, 150, 400}, -1));
+                                        } else {
+                                            v.vibrate(500);
+                                        }
+                                    }
+                                    sendAck(cleanUrl, email, "REMOTE", true, "تم تشغيل اهتزاز وتنبيه الهاتف");
+                                } catch (Exception e) {
+                                    sendAck(cleanUrl, email, "REMOTE", false, "تعذر تشغيل الاهتزاز: " + e.getMessage());
+                                }
                             }
                         } else {
                             updateState(false, "🔴 السيرفر غير مستجيب (كود " + response.code() + ")");
@@ -621,10 +666,10 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         }).start();
     }
 
-    public void wakeScreenAndDismissKeyguard() {
+    public void wakeScreenIfNeeded() {
         try {
             PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
-            if (pm != null) {
+            if (pm != null && !pm.isInteractive()) {
                 @SuppressWarnings("deprecation")
                 PowerManager.WakeLock wakeLock = pm.newWakeLock(
                         PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
@@ -638,21 +683,32 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         } catch (Exception e) {
             Log.e(TAG, "WakeScreen error: " + e.getMessage());
         }
+    }
 
-        // Dismiss simple swipe keyguard if present by dispatching an upward swipe gesture
+    public void wakeScreenAndDismissKeyguard() {
+        wakeScreenIfNeeded();
+
+        // Dismiss simple swipe keyguard ONLY if phone is actually locked
         try {
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
-                handler.postDelayed(() -> {
-                    Path swipePath = new Path();
-                    swipePath.moveTo(500, 1600);
-                    swipePath.lineTo(500, 400);
-                    GestureDescription.StrokeDescription stroke =
-                            new GestureDescription.StrokeDescription(swipePath, 0, 250);
-                    GestureDescription.Builder builder = new GestureDescription.Builder();
-                    builder.addStroke(stroke);
-                    dispatchGesture(builder.build(), null, null);
-                    Log.i(TAG, "Dismiss keyguard swipe gesture dispatched");
-                }, 300);
+            KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+            if (km != null && km.isKeyguardLocked()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+                    handler.postDelayed(() -> {
+                        if (km.isKeyguardLocked()) {
+                            Path swipePath = new Path();
+                            swipePath.moveTo(500, 1600);
+                            swipePath.lineTo(500, 400);
+                            GestureDescription.StrokeDescription stroke =
+                                    new GestureDescription.StrokeDescription(swipePath, 0, 250);
+                            GestureDescription.Builder builder = new GestureDescription.Builder();
+                            builder.addStroke(stroke);
+                            dispatchGesture(builder.build(), null, null);
+                            Log.i(TAG, "Dismiss keyguard swipe gesture dispatched because phone was locked");
+                        }
+                    }, 400);
+                }
+            } else {
+                Log.i(TAG, "Phone is not keyguard locked, no swipe needed");
             }
         } catch (Exception e) {
             Log.e(TAG, "Dismiss keyguard swipe error: " + e.getMessage());
@@ -671,8 +727,16 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         } catch (Exception ignored) {}
     }
 
+    public OkHttpClient getHttpClient() {
+        return httpClient;
+    }
+
     public void takeAndUploadScreenshot(String serverUrl, String email) {
-        ScreenshotHelper.captureAndUpload(this, serverUrl, email, httpClient);
+        takeAndUploadScreenshot(serverUrl, email, null);
+    }
+
+    public void takeAndUploadScreenshot(String serverUrl, String email, ScreenshotHelper.ScreenshotCallback callback) {
+        ScreenshotHelper.captureAndUpload(this, serverUrl, email, httpClient, callback);
     }
 
     private void updateState(boolean connected, String log) {

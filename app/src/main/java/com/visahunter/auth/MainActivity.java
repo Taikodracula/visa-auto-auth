@@ -27,6 +27,7 @@ public class MainActivity extends AppCompatActivity {
     private EditText etServerUrl;
     private Button btnSaveConnect;
     private Button btnTestClick;
+    private Button btnTestScreenshot;
     private TextView tvLog;
 
     private androidx.appcompat.widget.SwitchCompat swKeepScreenOn;
@@ -48,6 +49,7 @@ public class MainActivity extends AppCompatActivity {
         etServerUrl = findViewById(R.id.et_server_url);
         btnSaveConnect = findViewById(R.id.btn_save_connect);
         btnTestClick = findViewById(R.id.btn_test_click);
+        btnTestScreenshot = findViewById(R.id.btn_test_screenshot);
         tvLog = findViewById(R.id.tv_log);
 
         // Preload saved preferences
@@ -73,6 +75,7 @@ public class MainActivity extends AppCompatActivity {
         tvRestrictedSettingsHelp.setOnClickListener(v -> showRestrictedSettingsGuide());
         btnSaveConnect.setOnClickListener(v -> saveAndConnect());
         btnTestClick.setOnClickListener(v -> runTestClick());
+        btnTestScreenshot.setOnClickListener(v -> runTestScreenshot());
 
         // State listener from Accessibility Service
         AlmavivaAccessibilityService.setStateListener((connected, log) -> runOnUiThread(() -> {
@@ -217,6 +220,42 @@ public class MainActivity extends AppCompatActivity {
                     tvLog.setText("نتائج فحص النقر: " + message);
                 })
         );
+    }
+
+    private void runTestScreenshot() {
+        if (!AlmavivaAccessibilityService.isRunning()) {
+            Toast.makeText(this, "❌ يجب تفعيل إذن النقر التلقائي أولاً", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        String serverUrl = preferences.getServerUrl();
+        String email = preferences.getClientEmail();
+        if (email.isEmpty() || serverUrl.isEmpty()) {
+            Toast.makeText(this, "⚠️ يرجى حفظ بيانات البريد وعنوان السيرفر أولاً", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Toast.makeText(this, "📸 جاري التقاط الشاشة وفحص الصلاحيات...", Toast.LENGTH_SHORT).show();
+        tvLog.setText("📸 جاري التقاط الشاشة وإرسالها للسيرفر...");
+
+        AlmavivaAccessibilityService service = AlmavivaAccessibilityService.getInstance();
+        service.takeAndUploadScreenshot(serverUrl, email, (success, message) -> runOnUiThread(() -> {
+            if (success) {
+                Toast.makeText(this, "✅ " + message, Toast.LENGTH_LONG).show();
+                tvLog.setText("✅ " + message + "\nيمكنك رؤية شاشة هاتفك الآن في لوحة التحكم Mobile Hub!");
+            } else {
+                Toast.makeText(this, "⚠️ " + message, Toast.LENGTH_LONG).show();
+                tvLog.setText("⚠️ " + message);
+                if (message.contains("صلاحية") || message.contains("إعدادات")) {
+                    new AlertDialog.Builder(this)
+                            .setTitle("📸 تفعيل إذن تصوير الشاشة")
+                            .setMessage("لتفعيل ميزة تصوير الشاشة بعد التحديث:\n\n1️⃣ اضغط على (فتح الإعدادات) بالأسفل.\n2️⃣ أوقف مفتاح خدمة 'مساعد تأشيرات المافيفا'.\n3️⃣ أعد تشغيله مجدداً واضغط (سماح).\n\nستعمل ميزة بث الشاشة الحية فوراً 100%!")
+                            .setPositiveButton("فتح إعدادات إمكانية الوصول", (d, w) -> openAccessibilitySettings())
+                            .setNegativeButton("إلغاء", null)
+                            .show();
+                }
+            }
+        }));
     }
 
     private void applyKeepScreenOn(boolean enable) {
