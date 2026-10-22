@@ -178,6 +178,9 @@ public class MainActivity extends AppCompatActivity {
         Toast.makeText(this, "💾 تم حفظ البيانات!", Toast.LENGTH_SHORT).show();
 
         if (AlmavivaAccessibilityService.isRunning()) {
+            tvServerStatus.setText("⏳ جاري فحص الاتصال...");
+            tvServerStatus.setTextColor(ContextCompat.getColor(this, R.color.text_muted));
+            tvLog.setText("جاري إرسال إشارة الاتصال بالسيرفر...");
             AlmavivaAccessibilityService.getInstance().restartPolling();
         } else {
             Toast.makeText(this, "⚠️ يرجى تفعيل إذن النقر التلقائي لبدء الاتصال بالسيرفر", Toast.LENGTH_LONG).show();

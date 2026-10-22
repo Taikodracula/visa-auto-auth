@@ -434,6 +434,9 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                         .build();
 
                 try (Response r = httpClient.newCall(req).execute()) {
+                    if (r.isSuccessful()) {
+                        updateState(true, "🟢 متصل بالسيرفر وجاهز للموافقة الفورية");
+                    }
                     Log.d(TAG, "Heartbeat: " + r.code());
                 }
             } catch (Exception e) {
