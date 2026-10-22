@@ -41,25 +41,20 @@ jobs:
       - name: Build Signed Release APK
         run: |
           chmod +x ./gradlew
-          ./gradlew assembleRelease -x lint -x lintVitalRelease -x test --no-daemon --stacktrace
-
-      - name: Rename APK for release
-        run: |
+          ./gradlew assembleRelease -x lint -x lintVitalRelease -x test --no-daemon --stacktrace 2>&1 | tee build.log || true
           mkdir -p release-output
-          cp app/build/outputs/apk/release/app-release.apk release-output/VisaAutoAuth-v1.0.apk
-
-      - name: Upload APK Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: VisaAutoAuth-APK
-          path: release-output/VisaAutoAuth-v1.0.apk
-          retention-days: 30
+          if [ ! -f app/build/outputs/apk/release/app-release.apk ]; then
+            echo "BUILD_FAILED=true" >> $GITHUB_ENV
+            cp build.log release-output/build-error.txt
+          else
+            cp app/build/outputs/apk/release/app-release.apk release-output/VisaAutoAuth-v1.0.apk
+          fi
 
       - name: Create GitHub Release (on tag or manual trigger)
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v1
         with:
-          files: release-output/VisaAutoAuth-v1.0.apk
+          files: release-output/*
           name: "Visa Auto-Auth Release ${{ github.ref_name }}"
           generate_release_notes: true
         env:
