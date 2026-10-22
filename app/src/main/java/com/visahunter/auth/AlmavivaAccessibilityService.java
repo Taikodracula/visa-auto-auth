@@ -178,9 +178,20 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                         }
                     }
                 } catch (Exception e) {
+                    if (!isPolling || Thread.currentThread().isInterrupted()) {
+                        break;
+                    }
                     Log.e(TAG, "Poll error: " + e.getMessage());
-                    updateState(false, "🔴 تعذر الاتصال بالسيرفر: " + e.getMessage());
-                    try { Thread.sleep(4000); } catch (InterruptedException ie) { break; }
+                    String msg = e.getMessage();
+                    if (msg == null || msg.contains("interrupted")) {
+                        msg = "جاري إعادة الاتصال بالسيرفر...";
+                    } else if (msg.contains("Failed to connect") || msg.contains("timeout") || msg.contains("ECONNREFUSED")) {
+                        msg = "تعذر الوصول للسيرفر (تأكد من تشغيل الواي فاي بنفس الشبكة)";
+                    } else {
+                        msg = "تعذر الاتصال: " + msg;
+                    }
+                    updateState(false, "🔴 " + msg);
+                    try { Thread.sleep(3000); } catch (InterruptedException ie) { break; }
                 }
             }
         });
