@@ -7,6 +7,7 @@ public class AppPreferences {
     private static final String PREF_NAME = "visa_auto_auth_prefs";
     private static final String KEY_SERVER_URL = "server_url";
     private static final String KEY_CLIENT_EMAIL = "client_email";
+    private static final String KEY_KEEP_SCREEN_ON = "keep_screen_on";
 
     private final SharedPreferences prefs;
 
@@ -28,5 +29,13 @@ public class AppPreferences {
 
     public String getClientEmail() {
         return prefs.getString(KEY_CLIENT_EMAIL, "");
+    }
+
+    public void setKeepScreenOn(boolean keepOn) {
+        prefs.edit().putBoolean(KEY_KEEP_SCREEN_ON, keepOn).apply();
+    }
+
+    public boolean isKeepScreenOn() {
+        return prefs.getBoolean(KEY_KEEP_SCREEN_ON, true); // Enabled by default
     }
 }

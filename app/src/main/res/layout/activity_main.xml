@@ -140,6 +140,63 @@
             android:textSize="12sp"
             android:textStyle="bold" />
 
+        <!-- Work Hours & Screen Keep Awake Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:background="@drawable/card_bg"
+            android:orientation="vertical"
+            android:padding="16dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <LinearLayout
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:orientation="vertical">
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="⚡ إبقاء الشاشة نشطة (ساعات العمل)"
+                        android:textColor="@color/text_white"
+                        android:textSize="14sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="2dp"
+                        android:text="يمنع انطفاء أو قفل الشاشة أثناء تشغيل التطبيق"
+                        android:textColor="@color/text_muted"
+                        android:textSize="11sp" />
+                </LinearLayout>
+
+                <androidx.appcompat.widget.SwitchCompat
+                    android:id="@+id/sw_keep_screen_on"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:checked="true" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                android:background="#161e2e"
+                android:padding="10dp"
+                android:text="💡 إرشادات هامة للحجز المؤكد:\n• في ساعات العمل، اترك الهاتف متصلاً بالشاحن وافتح هذا التطبيق.\n• يفضل ضبط قفل الشاشة على (سحب فقط) بدون رمز لكي يفتح التطبيق شاشة الهاتف فور نزول المواعيد تلقائياً."
+                android:textColor="#93c5fd"
+                android:textSize="11sp"
+                android:lineSpacingExtra="2dp" />
+        </LinearLayout>
+
         <!-- Settings Card -->
         <LinearLayout
             android:layout_width="match_parent"

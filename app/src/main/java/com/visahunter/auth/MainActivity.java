@@ -29,6 +29,7 @@ public class MainActivity extends AppCompatActivity {
     private Button btnTestClick;
     private TextView tvLog;
 
+    private androidx.appcompat.widget.SwitchCompat swKeepScreenOn;
     private AppPreferences preferences;
 
     @Override
@@ -42,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
         tvServerStatus = findViewById(R.id.tv_server_status);
         btnEnableAccessibility = findViewById(R.id.btn_enable_accessibility);
         tvRestrictedSettingsHelp = findViewById(R.id.tv_restricted_settings_help);
+        swKeepScreenOn = findViewById(R.id.sw_keep_screen_on);
         etClientEmail = findViewById(R.id.et_client_email);
         etServerUrl = findViewById(R.id.et_server_url);
         btnSaveConnect = findViewById(R.id.btn_save_connect);
@@ -51,6 +53,20 @@ public class MainActivity extends AppCompatActivity {
         // Preload saved preferences
         etClientEmail.setText(preferences.getClientEmail());
         etServerUrl.setText(preferences.getServerUrl());
+
+        boolean keepScreenOn = preferences.isKeepScreenOn();
+        swKeepScreenOn.setChecked(keepScreenOn);
+        applyKeepScreenOn(keepScreenOn);
+
+        swKeepScreenOn.setOnCheckedChangeListener((buttonView, isChecked) -> {
+            preferences.setKeepScreenOn(isChecked);
+            applyKeepScreenOn(isChecked);
+            if (isChecked) {
+                Toast.makeText(this, "⚡ تم تفعيل إبقاء الشاشة مضاءة أثناء العمل", Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(this, "تم إلغاء إبقاء الشاشة مضاءة", Toast.LENGTH_SHORT).show();
+            }
+        });
 
         // Button listeners
         btnEnableAccessibility.setOnClickListener(v -> openAccessibilitySettings());
@@ -201,5 +217,13 @@ public class MainActivity extends AppCompatActivity {
                     tvLog.setText("نتائج فحص النقر: " + message);
                 })
         );
+    }
+
+    private void applyKeepScreenOn(boolean enable) {
+        if (enable) {
+            getWindow().addFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        } else {
+            getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
+        }
     }
 }

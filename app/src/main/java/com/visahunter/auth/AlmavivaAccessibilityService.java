@@ -6,17 +6,27 @@ import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
+import android.app.KeyguardManager;
+import android.graphics.Bitmap;
 import android.graphics.Path;
 import android.graphics.Rect;
+import android.hardware.HardwareBuffer;
+import android.os.BatteryManager;
 import android.os.Build;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
+import android.os.VibrationEffect;
+import android.os.Vibrator;
+import android.util.Base64;
 import android.util.Log;
+import android.view.Display;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
 import org.json.JSONObject;
 
+import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -163,9 +173,26 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 String challengeId = json.optString("challengeId", "");
                                 updateState(true, "📲 استلام طلب تأكيد MFA (كود: " + challengeId + ")...");
 
+                                wakeScreenAndDismissKeyguard();
                                 startMfaAutomation(qrText, (success, message) -> {
                                     updateState(true, success ? "✅ تم التأكيد بنجاح: " + message : "⚠️ فشل: " + message);
                                     sendAck(cleanUrl, email, challengeId, success, message);
+                                    // Auto capture result screen after 1.5 seconds
+                                    handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 1500);
+                                });
+                            } else if ("CAPTURE_SCREEN".equals(action)) {
+                                Log.i(TAG, "Server requested screenshot capture");
+                                wakeScreenAndDismissKeyguard();
+                                updateState(true, "📸 تم التقاط شاشة الهاتف للمعاينة المباشرة");
+                                takeAndUploadScreenshot(cleanUrl, email);
+                            } else if ("TEST_ALMAVIVA".equals(action)) {
+                                Log.i(TAG, "Server requested test click sequence");
+                                wakeScreenAndDismissKeyguard();
+                                updateState(true, "🧪 فحص تجريبي للنقر وفتح المافيفا...");
+                                startMfaAutomation("TEST_FROM_MOBILE_HUB", (success, message) -> {
+                                    updateState(true, (success ? "✅ نجح الفحص: " : "⚠️ فشل الفحص: ") + message);
+                                    sendAck(cleanUrl, email, "TEST", success, message);
+                                    handler.postDelayed(() -> takeAndUploadScreenshot(cleanUrl, email), 1500);
                                 });
                             }
                         } else {
@@ -217,6 +244,8 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             Log.w(TAG, "Automation already in progress, aborting previous");
             cancelAutomation();
         }
+
+        wakeScreenAndDismissKeyguard();
 
         isAutomating = true;
         currentStep = 1;
@@ -553,9 +582,18 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
     private void sendHeartbeat(String serverUrl, String email) {
         new Thread(() -> {
             try {
+                int batteryLevel = -1;
+                try {
+                    BatteryManager bm = (BatteryManager) getSystemService(Context.BATTERY_SERVICE);
+                    if (bm != null) {
+                        batteryLevel = bm.getIntProperty(BatteryManager.BATTERY_PROPERTY_CAPACITY);
+                    }
+                } catch (Exception ignored) {}
+
                 JSONObject payload = new JSONObject();
                 payload.put("email", email);
                 payload.put("accessibilityEnabled", true);
+                payload.put("battery", batteryLevel);
                 payload.put("timestamp", System.currentTimeMillis());
 
                 RequestBody body = RequestBody.create(
@@ -576,6 +614,125 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 }
             } catch (Exception e) {
                 Log.d(TAG, "Heartbeat failed: " + e.getMessage());
+            }
+        }).start();
+    }
+
+    public void wakeScreenAndDismissKeyguard() {
+        try {
+            PowerManager pm = (PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null) {
+                @SuppressWarnings("deprecation")
+                PowerManager.WakeLock wakeLock = pm.newWakeLock(
+                        PowerManager.SCREEN_BRIGHT_WAKE_LOCK |
+                        PowerManager.ACQUIRE_CAUSES_WAKEUP |
+                        PowerManager.ON_AFTER_RELEASE,
+                        "VisaAutoAuth:WakeScreenLock"
+                );
+                wakeLock.acquire(15000); // 15 seconds
+                Log.i(TAG, "Screen woken up successfully via WakeLock");
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "WakeScreen error: " + e.getMessage());
+        }
+
+        // Dismiss simple swipe keyguard if present
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                KeyguardManager km = (KeyguardManager) getSystemService(Context.KEYGUARD_SERVICE);
+                if (km != null && km.isKeyguardLocked()) {
+                    performGlobalAction(GLOBAL_ACTION_DISMISS_KEYGUARD);
+                    Log.i(TAG, "Dismiss keyguard action dispatched");
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Dismiss keyguard error: " + e.getMessage());
+        }
+
+        // Alert vibration in case screen is PIN/Fingerprint locked
+        try {
+            Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+            if (v != null && v.hasVibrator()) {
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                    v.vibrate(VibrationEffect.createWaveform(new long[]{0, 200, 100, 200}, -1));
+                } else {
+                    v.vibrate(300);
+                }
+            }
+        } catch (Exception ignored) {}
+    }
+
+    public void takeAndUploadScreenshot(String serverUrl, String email) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+            try {
+                takeScreenshot(Display.DEFAULT_DISPLAY, getMainExecutor(), new AccessibilityService.TakeScreenshotCallback() {
+                    @Override
+                    public void onSuccess(AccessibilityService.ScreenshotResult screenshotResult) {
+                        try {
+                            HardwareBuffer hardwareBuffer = screenshotResult.getHardwareBuffer();
+                            Bitmap bitmap = Bitmap.wrapHardwareBuffer(hardwareBuffer, screenshotResult.getColorSpace());
+                            if (bitmap != null) {
+                                Bitmap copy = bitmap.copy(Bitmap.Config.ARGB_8888, false);
+                                hardwareBuffer.close();
+
+                                // Resize down if dimension > 1280 to save bandwidth and keep response instant
+                                int maxDim = Math.max(copy.getWidth(), copy.getHeight());
+                                Bitmap uploadBitmap = copy;
+                                if (maxDim > 1280) {
+                                    float scale = 1280f / maxDim;
+                                    int nw = Math.round(copy.getWidth() * scale);
+                                    int nh = Math.round(copy.getHeight() * scale);
+                                    uploadBitmap = Bitmap.createScaledBitmap(copy, nw, nh, true);
+                                }
+
+                                ByteArrayOutputStream baos = new ByteArrayOutputStream();
+                                uploadBitmap.compress(Bitmap.CompressFormat.JPEG, 75, baos);
+                                byte[] imageBytes = baos.toByteArray();
+                                String base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
+
+                                uploadScreenshotPayload(serverUrl, email, base64Image);
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Failed to process screenshot bitmap: " + e.getMessage());
+                        }
+                    }
+
+                    @Override
+                    public void onFailure(int errorCode) {
+                        Log.w(TAG, "takeScreenshot failed with error code: " + errorCode);
+                    }
+                });
+            } catch (Exception e) {
+                Log.e(TAG, "takeScreenshot exception: " + e.getMessage());
+            }
+        } else {
+            Log.i(TAG, "takeScreenshot requires Android 11+ (API 30+)");
+        }
+    }
+
+    private void uploadScreenshotPayload(String serverUrl, String email, String base64Image) {
+        new Thread(() -> {
+            try {
+                JSONObject payload = new JSONObject();
+                payload.put("email", email);
+                payload.put("image", "data:image/jpeg;base64," + base64Image);
+                payload.put("timestamp", System.currentTimeMillis());
+
+                RequestBody body = RequestBody.create(
+                        payload.toString(),
+                        MediaType.parse("application/json; charset=utf-8")
+                );
+
+                Request req = new Request.Builder()
+                        .url(serverUrl.replaceAll("/+$", "") + "/api/client-app/screenshot")
+                        .post(body)
+                        .build();
+
+                try (Response r = httpClient.newCall(req).execute()) {
+                    Log.i(TAG, "Screenshot upload response: " + r.code());
+                }
+            } catch (Exception e) {
+                Log.e(TAG, "Failed to upload screenshot: " + e.getMessage());
             }
         }).start();
     }
