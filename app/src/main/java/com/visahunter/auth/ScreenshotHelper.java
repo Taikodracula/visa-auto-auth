@@ -31,14 +31,18 @@ public class ScreenshotHelper {
     }
 
     public static void captureAndUpload(AccessibilityService service, String serverUrl, String email, OkHttpClient httpClient) {
-        captureAndUpload(service, serverUrl, email, httpClient, null);
+        captureAndUpload(service, serverUrl, email, httpClient, false, null);
     }
 
     public static void captureAndUpload(AccessibilityService service, String serverUrl, String email, OkHttpClient httpClient, ScreenshotCallback callback) {
+        captureAndUpload(service, serverUrl, email, httpClient, false, callback);
+    }
+
+    public static void captureAndUpload(AccessibilityService service, String serverUrl, String email, OkHttpClient httpClient, boolean isStream, ScreenshotCallback callback) {
         if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R || service == null) {
             String msg = "التقاط الشاشة يتطلب أندرويد 11 أو أحدث (جهازك: API " + Build.VERSION.SDK_INT + ")";
             Log.w(TAG, msg);
-            sendAck(serverUrl, email, "SCREENSHOT", false, msg, httpClient);
+            if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, msg, httpClient);
             if (callback != null) callback.onResult(false, msg);
             return;
         }
@@ -51,8 +55,7 @@ public class ScreenshotHelper {
                     HardwareBuffer hardwareBuffer = screenshotResult.getHardwareBuffer();
                     if (hardwareBuffer == null) {
                         String err = "تعذر تحويل مخزن الشاشة إلى صورة (HardwareBuffer null)";
-                        Log.e(TAG, err);
-                        sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
+                        if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
                         if (callback != null) callback.onResult(false, err);
                         return;
                     }
@@ -90,18 +93,19 @@ public class ScreenshotHelper {
 
                     if (copy == null) {
                         String err = "تعذر قراءة بكسلات الشاشة من الهاتف";
-                        Log.e(TAG, err);
-                        sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
+                        if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
                         if (callback != null) callback.onResult(false, err);
                         return;
                     }
 
                     try {
-                        // Resize down if max dimension > 1280
+                        int limitDim = isStream ? 640 : 1280;
+                        int quality = isStream ? 50 : 70;
+
                         int maxDim = Math.max(copy.getWidth(), copy.getHeight());
                         Bitmap uploadBitmap = copy;
-                        if (maxDim > 1280) {
-                            float scale = 1280f / maxDim;
+                        if (maxDim > limitDim) {
+                            float scale = (float) limitDim / maxDim;
                             int nw = Math.round(copy.getWidth() * scale);
                             int nh = Math.round(copy.getHeight() * scale);
                             uploadBitmap = Bitmap.createScaledBitmap(copy, nw, nh, true);
@@ -111,16 +115,16 @@ public class ScreenshotHelper {
                         }
 
                         ByteArrayOutputStream baos = new ByteArrayOutputStream();
-                        uploadBitmap.compress(Bitmap.CompressFormat.JPEG, 70, baos);
+                        uploadBitmap.compress(Bitmap.CompressFormat.JPEG, quality, baos);
                         uploadBitmap.recycle();
                         byte[] imageBytes = baos.toByteArray();
                         String base64Image = Base64.encodeToString(imageBytes, Base64.NO_WRAP);
 
-                        uploadPayload(serverUrl, email, base64Image, httpClient, callback);
+                        uploadPayload(serverUrl, email, base64Image, isStream, httpClient, callback);
                     } catch (Exception e) {
                         String err = "خطأ أثناء معالجة لقطة الشاشة: " + e.getMessage();
                         Log.e(TAG, err, e);
-                        sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
+                        if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
                         if (callback != null) callback.onResult(false, err);
                     }
                 }
@@ -136,24 +140,25 @@ public class ScreenshotHelper {
                         default: reason = "كود الخطأ: " + errorCode; break;
                     }
                     Log.w(TAG, "takeScreenshot failed: " + reason);
-                    sendAck(serverUrl, email, "SCREENSHOT", false, reason, httpClient);
+                    if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, reason, httpClient);
                     if (callback != null) callback.onResult(false, reason);
                 }
             });
         } catch (Exception e) {
             String err = "تعذر استدعاء takeScreenshot: " + e.getMessage();
             Log.e(TAG, err, e);
-            sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
+            if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, err, httpClient);
             if (callback != null) callback.onResult(false, err);
         }
     }
 
-    private static void uploadPayload(String serverUrl, String email, String base64Image, OkHttpClient httpClient, ScreenshotCallback callback) {
+    private static void uploadPayload(String serverUrl, String email, String base64Image, boolean isStream, OkHttpClient httpClient, ScreenshotCallback callback) {
         new Thread(() -> {
             try {
                 JSONObject payload = new JSONObject();
                 payload.put("email", email);
                 payload.put("image", "data:image/jpeg;base64," + base64Image);
+                payload.put("isStream", isStream);
                 payload.put("timestamp", System.currentTimeMillis());
 
                 RequestBody body = RequestBody.create(
@@ -168,19 +173,22 @@ public class ScreenshotHelper {
 
                 try (Response r = httpClient.newCall(req).execute()) {
                     boolean ok = r.isSuccessful();
-                    Log.i(TAG, "Screenshot upload HTTP: " + r.code());
-                    sendAck(serverUrl, email, "SCREENSHOT", ok, ok ? "تم التقاط ورفع صورة الشاشة بنجاح" : "فشل خادم الرفع كود " + r.code(), httpClient);
+                    if (!isStream) {
+                        Log.i(TAG, "Screenshot upload HTTP: " + r.code());
+                        sendAck(serverUrl, email, "SCREENSHOT", ok, ok ? "تم التقاط ورفع صورة الشاشة بنجاح" : "فشل خادم الرفع كود " + r.code(), httpClient);
+                    }
                     if (callback != null) {
-                        callback.onResult(ok, ok ? "تم التقاط ورفع الشاشة بنجاح" : "فشل السيرفر كود " + r.code());
+                        callback.onResult(ok, ok ? "تم بنجاح" : "فشل كود " + r.code());
                     }
                 }
             } catch (Exception e) {
                 Log.e(TAG, "Upload failed: " + e.getMessage());
-                sendAck(serverUrl, email, "SCREENSHOT", false, "فشل إرسال الشاشة للسيرفر: " + e.getMessage(), httpClient);
+                if (!isStream) sendAck(serverUrl, email, "SCREENSHOT", false, "فشل إرسال الشاشة: " + e.getMessage(), httpClient);
                 if (callback != null) callback.onResult(false, e.getMessage());
             }
         }).start();
     }
+
 
     private static void sendAck(String serverUrl, String email, String challengeId, boolean success, String message, OkHttpClient httpClient) {
         new Thread(() -> {

