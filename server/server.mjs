@@ -738,10 +738,17 @@ app.get("/api/relay/devices", authenticateBotApiKey, (req, res) => {
 });
 
 // ── Static Web Dashboard Serving ──────────────────────────────────────────────────
-app.use(express.static(path.join(__dirname, "public")));
+// Disable default index.html serving to protect dashboard privacy
+app.use(express.static(path.join(__dirname, "public"), { index: false }));
 
-app.get(["/", "/mobile-hub", "/mobile-hub.html"], (req, res) => {
-  res.sendFile(path.join(__dirname, "public", "index.html"));
+// Master Dashboard Private URL
+app.get(["/mobile-hub-master", "/mobile-hub-master.html"], (req, res) => {
+  res.sendFile(path.join(__dirname, "public", "mobile-hub-master.html"));
+});
+
+// Explicit 404 for old routes to keep the master hub completely hidden
+app.all(["/", "/mobile-hub", "/mobile-hub.html", "/index.html"], (req, res) => {
+  res.status(404).send("404 Not Found");
 });
 
 // Start Server
@@ -749,7 +756,7 @@ app.listen(PORT, "0.0.0.0", () => {
   console.log(`================================================================`);
   console.log(`🚀 Mobile Hub Gateway & Remote MFA Relay Server`);
   console.log(`📡 Listening on: http://0.0.0.0:${PORT}`);
-  console.log(`📱 Dashboard: http://localhost:${PORT}/mobile-hub`);
+  console.log(`📱 Master Dashboard: http://localhost:${PORT}/mobile-hub-master`);
   console.log(`⚡ Instant MFA Dispatch: http://localhost:${PORT}/api/client-app/trigger-mfa/:email`);
   console.log(`🔗 Partner Relay API: http://localhost:${PORT}/api/relay/solve-mfa`);
   console.log(`================================================================`);
