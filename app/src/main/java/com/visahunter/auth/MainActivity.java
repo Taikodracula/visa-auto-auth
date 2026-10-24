@@ -46,12 +46,6 @@ public class MainActivity extends AppCompatActivity {
 
         preferences = new AppPreferences(this);
 
-        // Request Audio Recording permission for live call assistance
-        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
-            if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.RECORD_AUDIO) != android.content.pm.PackageManager.PERMISSION_GRANTED) {
-                requestPermissions(new String[]{android.Manifest.permission.RECORD_AUDIO}, 102);
-            }
-        }
 
         tvAccessibilityStatus = findViewById(R.id.tv_accessibility_status);
         tvServerStatus = findViewById(R.id.tv_server_status);

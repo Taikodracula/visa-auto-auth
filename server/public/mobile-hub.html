@@ -1147,33 +1147,6 @@
           </div>
         </div>
 
-        <!-- Dedicated Live Audio Suite (سماعة الاستماع لصوت الهاتف والعميل لمكالمة الفيديو) -->
-        <div class="studio-audio-panel">
-          <div style="display:flex; align-items:center; gap:12px;">
-            <button class="audio-btn-listen" id="studio-audio-toggle" onclick="toggleStudioAudio()">
-              <span id="studio-audio-icon">🎧</span>
-              <span id="studio-audio-text">استماع لصوت الهاتف والعميل (مكالمة الفيديو)</span>
-            </button>
-            <div id="studio-audio-status-pill" style="font-size:11px; color:#94a3b8; font-weight:600;">
-              ⚪ السماعة متوقفة
-            </div>
-          </div>
-
-          <!-- Waveform & Volume -->
-          <div style="display:flex; align-items:center; gap:14px; flex-wrap:wrap;">
-            <canvas id="studio-audio-canvas" class="audio-waveform-canvas" width="130" height="32" title="موجات الصوت الحية لمكالمة الفيديو"></canvas>
-            
-            <div class="audio-volume-wrap">
-              <span id="vol-icon" onclick="toggleMuteAudio()" style="cursor:pointer;" title="كتم / تشغيل">🔊</span>
-              <input type="range" id="studio-volume-slider" class="audio-slider" min="0" max="100" value="100" oninput="setAudioVolume(this.value)" title="مستوى صوت المكالمة">
-              <span id="studio-volume-val" style="min-width:32px; font-family:'JetBrains Mono',monospace;">100%</span>
-            </div>
-
-            <button class="btn btn-secondary btn-sm" onclick="testAudioChime()" style="padding:4px 8px; font-size:11px;" title="تجربة مكبر الصوت في المتصفح">
-              <span>🔔 اختبار السماعة</span>
-            </button>
-          </div>
-        </div>
 
         <!-- Phone Stage -->
         <div class="studio-screen-stage">
