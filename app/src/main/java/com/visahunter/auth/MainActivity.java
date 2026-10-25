@@ -276,4 +276,24 @@ public class MainActivity extends AppCompatActivity {
             getWindow().clearFlags(android.view.WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON);
         }
     }
+
+    public void requestIgnoreBatteryOptimizations() {
+        if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.M) {
+            android.os.PowerManager pm = (android.os.PowerManager) getSystemService(Context.POWER_SERVICE);
+            if (pm != null && !pm.isIgnoringBatteryOptimizations(getPackageName())) {
+                try {
+                    Intent intent = new Intent(Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS);
+                    intent.setData(Uri.parse("package:" + getPackageName()));
+                    startActivity(intent);
+                } catch (Exception e) {
+                    try {
+                        Intent fallback = new Intent(Settings.ACTION_IGNORE_BATTERY_OPTIMIZATION_SETTINGS);
+                        startActivity(fallback);
+                    } catch (Exception ignored) {}
+                }
+            } else {
+                Toast.makeText(this, "✅ توفير البطارية معطل بالفعل لهذا التطبيق", Toast.LENGTH_SHORT).show();
+            }
+        }
+    }
 }

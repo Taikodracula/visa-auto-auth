@@ -180,6 +180,18 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                             if ("TRIGGER_MFA".equals(action)) {
                                 String qrText = json.optString("qrText", "");
                                 String challengeId = json.optString("challengeId", "");
+                                long timestamp = json.optLong("timestamp", 0);
+                                long nowMs = System.currentTimeMillis();
+
+                                // 🛡️ Drop stale / expired challenge if older than 25 seconds
+                                if (timestamp > 0 && (nowMs - timestamp) > 25000) {
+                                    long ageSec = (nowMs - timestamp) / 1000;
+                                    Log.w(TAG, "⚠️ [STALE CHALLENGE] Dropping expired challenge (" + ageSec + "s old): " + challengeId);
+                                    updateState(true, "⚠️ تم تجاهل شالنج منتهي الصلاحية (" + ageSec + " ثانية مضت)");
+                                    sendAck(cleanUrl, email, challengeId, false, "stale_challenge_dropped_age_" + ageSec + "s");
+                                    continue;
+                                }
+
                                 updateState(true, "📲 استلام طلب تأكيد MFA (كود: " + challengeId + ")...");
 
                                 wakeScreenAndDismissKeyguard();
@@ -384,7 +396,10 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         timeoutRunnable = () -> {
             if (isAutomating) {
                 Log.w(TAG, "Automation timed out at step " + currentStep);
-                performGlobalAction(GLOBAL_ACTION_HOME);
+                returnToApp();
+                if (preferences != null) {
+                    takeAndUploadScreenshot(preferences.getServerUrl(), preferences.getClientEmail());
+                }
                 finishAutomation(false, "انتهت المهلة قبل إتمام جميع النقرات (خطوة " + currentStep + ")", activeCallback);
             }
         };
@@ -407,65 +422,77 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
             boolean stepSuccess = false;
             switch (currentStep) {
                 case 1:
-                    // Step 1: Click "امسح رمز الاستجابة السريعة"
-                    stepSuccess = findAndClickSmart(root, true, "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة");
+                    // Step 1: Click "امسح رمز الاستجابة السريعة" (Arabic, English, Italian)
+                    stepSuccess = findAndClickSmart(root, true,
+                            "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة",
+                            "Scan QR Code", "Scan QR", "Scan",
+                            "Scansiona codice QR", "Scansiona QR", "Scansiona", "Inquadra");
                     if (!stepSuccess) {
-                        stepSuccess = findAndClickSmart(root, false, "امسح رمز الاستجابة السريعة", "Scan QR");
+                        stepSuccess = findAndClickSmart(root, false,
+                                "امسح رمز الاستجابة السريعة", "Scan QR", "Scansiona");
                     }
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 1 SUCCESS] Clicked Scan QR Code");
                         currentStep = 2;
-                        handler.postDelayed(stepLoopRunnable, 1200);
-                        return;
-                    }
-                    break;
-
-                case 2:
-                    // Step 2: Click "الصق القيمة المنسوخة" (strictly prefer exact match and bottom button to avoid top subtext)
-                    stepSuccess = findAndClickSmart(root, true, "الصق القيمة المنسوخة", "لصق القيمة المنسوخة");
-                    if (!stepSuccess) {
-                        stepSuccess = findAndClickSmart(root, false, "الصق القيمة المنسوخة");
-                    }
-                    if (stepSuccess) {
-                        Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value button");
-                        currentStep = 3;
-                        handler.postDelayed(stepLoopRunnable, 1500);
-                        return;
-                    }
-                    break;
-
-                case 3:
-                    // Step 3: Click "تأكيد"
-                    stepSuccess = findAndClickSmart(root, true, "تأكيد", "تاكيد", "Confirm");
-                    if (!stepSuccess) {
-                        stepSuccess = findAndClickSmart(root, false, "تأكيد", "Confirm");
-                    }
-                    if (stepSuccess) {
-                        Log.i(TAG, "✅ [STEP 3 SUCCESS] Clicked Confirm");
-                        currentStep = 4;
-                        handler.postDelayed(stepLoopRunnable, 2200);
-                        return;
-                    }
-                    break;
-
-                case 4:
-                    // Step 4: Click "حسناً"
-                    stepSuccess = findAndClickSmart(root, true, "حسناً", "حسنا", "OK", "Ok", "تم");
-                    if (!stepSuccess) {
-                        stepSuccess = findAndClickSmart(root, false, "حسناً", "حسنا", "OK", "تم");
-                    }
-                    if (stepSuccess) {
-                        Log.i(TAG, "✅ [STEP 4 SUCCESS] Clicked OK");
-                        currentStep = 5;
                         handler.postDelayed(stepLoopRunnable, 1000);
                         return;
                     }
                     break;
 
+                case 2:
+                    // Step 2: Click "الصق القيمة المنسوخة" (Arabic, English, Italian)
+                    stepSuccess = findAndClickSmart(root, true,
+                            "الصق القيمة المنسوخة", "لصق القيمة المنسوخة", "الصق",
+                            "Paste copied value", "Paste value", "Paste",
+                            "Incolla valore copiato", "Incolla valore", "Incolla");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false,
+                                "الصق القيمة المنسوخة", "Paste copied value", "Incolla");
+                    }
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value button");
+                        currentStep = 3;
+                        handler.postDelayed(stepLoopRunnable, 1200);
+                        return;
+                    }
+                    break;
+
+                case 3:
+                    // Step 3: Click "تأكيد" (Arabic, English, Italian)
+                    stepSuccess = findAndClickSmart(root, true,
+                            "تأكيد", "تاكيد", "Confirm", "Confirmar", "Conferma");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false,
+                                "تأكيد", "Confirm", "Conferma");
+                    }
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 3 SUCCESS] Clicked Confirm");
+                        currentStep = 4;
+                        handler.postDelayed(stepLoopRunnable, 1800);
+                        return;
+                    }
+                    break;
+
+                case 4:
+                    // Step 4: Click "حسناً" (Arabic, English, Italian)
+                    stepSuccess = findAndClickSmart(root, true,
+                            "حسناً", "حسنا", "OK", "Ok", "تم", "Done", "Fatto", "Chiudi");
+                    if (!stepSuccess) {
+                        stepSuccess = findAndClickSmart(root, false,
+                                "حسناً", "حسنا", "OK", "تم", "Done", "Fatto", "Chiudi");
+                    }
+                    if (stepSuccess) {
+                        Log.i(TAG, "✅ [STEP 4 SUCCESS] Clicked OK");
+                        currentStep = 5;
+                        handler.postDelayed(stepLoopRunnable, 800);
+                        return;
+                    }
+                    break;
+
                 case 5:
-                    // Step 5: Finished, go Home
-                    Log.i(TAG, "✅ [STEP 5 SUCCESS] Returning to Home Screen");
-                    performGlobalAction(GLOBAL_ACTION_HOME);
+                    // Step 5: Finished -> Return to VisaHunter app to keep screen awake!
+                    Log.i(TAG, "✅ [STEP 5 SUCCESS] Returning to VisaHunter App (Stay Awake)");
+                    returnToApp();
                     finishAutomation(true, "تم تأكيد الرمز والموافقة بنجاح 100%", activeCallback);
                     return;
             }
@@ -777,6 +804,19 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 }
             }
         } catch (Exception ignored) {}
+    }
+
+    public void returnToApp() {
+        try {
+            wakeScreenIfNeeded();
+            Intent intent = new Intent(this, MainActivity.class);
+            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_REORDER_TO_FRONT);
+            startActivity(intent);
+            Log.i(TAG, "✅ [STAY AWAKE] Returned to VisaHunter MainActivity successfully");
+        } catch (Exception e) {
+            Log.e(TAG, "Failed to return to app: " + e.getMessage());
+            try { performGlobalAction(GLOBAL_ACTION_HOME); } catch (Exception ignored) {}
+        }
     }
 
     public OkHttpClient getHttpClient() {
