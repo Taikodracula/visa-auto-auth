@@ -30,6 +30,10 @@ public class MainActivity extends AppCompatActivity {
     private Button btnTestScreenshot;
     private TextView tvLog;
 
+    private TextView tvAppVersion;
+    private Button btnUpdateApp;
+    private TextView tvUpdateAdvisory;
+
     private androidx.appcompat.widget.SwitchCompat swKeepScreenOn;
     private AppPreferences preferences;
 
@@ -58,6 +62,24 @@ public class MainActivity extends AppCompatActivity {
         btnTestClick = findViewById(R.id.btn_test_click);
         btnTestScreenshot = findViewById(R.id.btn_test_screenshot);
         tvLog = findViewById(R.id.tv_log);
+        tvAppVersion = findViewById(R.id.tv_app_version);
+        btnUpdateApp = findViewById(R.id.btn_update_app);
+        tvUpdateAdvisory = findViewById(R.id.tv_update_advisory);
+
+        if (tvAppVersion != null) {
+            tvAppVersion.setText("الإصدار الحالي: " + UpdateManager.getCurrentVersionName(this));
+        }
+
+        if (btnUpdateApp != null) {
+            btnUpdateApp.setOnClickListener(v -> UpdateManager.checkForUpdates(this, true, null));
+        }
+
+        if (tvUpdateAdvisory != null) {
+            tvUpdateAdvisory.setOnClickListener(v -> openAccessibilitySettings());
+        }
+
+        // Check for updates silently on app open
+        UpdateManager.checkForUpdates(this, false, null);
 
         // Preload saved preferences
         etClientEmail.setText(preferences.getClientEmail());
@@ -253,14 +275,14 @@ public class MainActivity extends AppCompatActivity {
         service.takeAndUploadScreenshot(serverUrl, email, (success, message) -> runOnUiThread(() -> {
             if (success) {
                 Toast.makeText(this, "✅ " + message, Toast.LENGTH_LONG).show();
-                tvLog.setText("✅ " + message + "\nيمكنك رؤية شاشة هاتفك الآن في لوحة التحكم Mobile Hub!");
+                tvLog.setText("✅ " + message);
             } else {
                 Toast.makeText(this, "⚠️ " + message, Toast.LENGTH_LONG).show();
                 tvLog.setText("⚠️ " + message);
                 if (message.contains("صلاحية") || message.contains("إعدادات")) {
                     new AlertDialog.Builder(this)
-                            .setTitle("📸 تفعيل إذن تصوير الشاشة")
-                            .setMessage("لتفعيل ميزة تصوير الشاشة بعد التحديث:\n\n1️⃣ اضغط على (فتح الإعدادات) بالأسفل.\n2️⃣ أوقف مفتاح خدمة 'مساعد تأشيرات المافيفا'.\n3️⃣ أعد تشغيله مجدداً واضغط (سماح).\n\nستعمل ميزة بث الشاشة الحية فوراً 100%!")
+                            .setTitle("💡 تنبيه هام بعد التحديث")
+                            .setMessage("يجب عليك إيقاف إذن النقر وإعادة تشغيله مرة أخرى واحدة في الإعدادات بعد تثبيت التحديث.")
                             .setPositiveButton("فتح إعدادات إمكانية الوصول", (d, w) -> openAccessibilitySettings())
                             .setNegativeButton("إلغاء", null)
                             .show();

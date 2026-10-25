@@ -140,18 +140,68 @@
             android:textSize="12sp"
             android:textStyle="bold" />
 
-        <!-- Screenshot Advisory -->
+        <!-- In-App Auto-Update Card -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:background="@drawable/card_bg"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:padding="14dp">
+
+            <LinearLayout
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/tv_app_version"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="الإصدار الحالي: v1.7.0"
+                    android:textColor="@color/text_white"
+                    android:textSize="13sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/tv_update_hint"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="2dp"
+                    android:text="اضغط للتحقق وتثبيت التحديثات تلقائياً"
+                    android:textColor="@color/text_muted"
+                    android:textSize="11sp" />
+            </LinearLayout>
+
+            <Button
+                android:id="@+id/btn_update_app"
+                android:layout_width="wrap_content"
+                android:layout_height="42dp"
+                android:background="@drawable/btn_primary"
+                android:paddingStart="14dp"
+                android:paddingEnd="14dp"
+                android:text="🔄 تحديث التطبيق"
+                android:textColor="@color/bg_dark"
+                android:textSize="12sp"
+                android:textStyle="bold"
+                app:backgroundTint="@null" />
+        </LinearLayout>
+
+        <!-- Post-Update Advisory -->
         <TextView
-            android:id="@+id/tv_screenshot_advisory"
+            android:id="@+id/tv_update_advisory"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="10dp"
             android:background="@drawable/card_bg"
-            android:padding="10dp"
+            android:padding="12dp"
             android:gravity="center"
-            android:text="💡 تنبيه: لتفعيل بث الشاشة الحية، أوقف إذن النقر وأعد تشغيله مرة واحدة في الإعدادات بعد تثبيت التحديث"
+            android:text="💡 تنبيه هام بعد التحديث:\nيجب عليك إيقاف إذن النقر وإعادة تشغيله مرة أخرى واحدة في الإعدادات بعد تثبيت التحديث"
             android:textColor="#38BDF8"
-            android:textSize="11sp"
+            android:textSize="12sp"
+            android:lineSpacingExtra="2dp"
             android:textStyle="bold" />
 
         <!-- Work Hours & Screen Keep Awake Card -->
@@ -205,10 +255,10 @@
                 android:layout_marginTop="10dp"
                 android:background="#161e2e"
                 android:padding="10dp"
-                android:text="💡 إرشادات هامة للحجز المؤكد:\n• في ساعات العمل، اترك الهاتف متصلاً بالشاحن وافتح هذا التطبيق.\n• يفضل ضبط قفل الشاشة على (سحب فقط) بدون رمز لكي يفتح التطبيق شاشة الهاتف فور نزول المواعيد تلقائياً."
+                android:text="💡 إرشادات هامة للحجز المؤكد:\n• بعد تثبيت التحديث: يجب عليك إيقاف إذن النقر وإعادة تشغيله مرة أخرى واحدة في الإعدادات.\n• في ساعات العمل، اترك الهاتف متصلاً بالشاحن وافتح هذا التطبيق.\n• يفضل ضبط قفل الشاشة على (سحب فقط) بدون رمز لكي يفتح التطبيق شاشة الهاتف فور نزول المواعيد تلقائياً."
                 android:textColor="#93c5fd"
                 android:textSize="11sp"
-                android:lineSpacingExtra="2dp" />
+                android:lineSpacingExtra="3dp" />
         </LinearLayout>
 
         <!-- Settings Card -->
