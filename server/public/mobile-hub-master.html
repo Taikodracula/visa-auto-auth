@@ -1005,14 +1005,17 @@
     </div>
 
     <div class="header-actions">
+      <button class="btn btn-warning btn-sm" onclick="openBroadcastModal()" style="background: linear-gradient(135deg, #f59e0b, #d97706); border: none; box-shadow: 0 0 15px rgba(245, 158, 11, 0.4);" title="إرسال إشعار دفاعي فوري واهتزاز لجميع الهواتف المتصلة">
+        <span>📢 إشعار دفاعي جماعي</span>
+      </button>
       <a href="/" class="btn btn-outline btn-sm">
         <span>📊 لوحة المواعيد الرئيسية</span>
       </a>
-      <a href="https://github.com/Taikodracula/visa-auto-auth/releases/download/v1.2.7/VisaAutoAuth-v1.0.apk" target="_blank" class="btn btn-primary btn-sm">
-        <span>🐙 تحميل APK من GitHub v1.2.7</span>
+      <a href="https://github.com/Taikodracula/visa-auto-auth/releases/latest" target="_blank" class="btn btn-primary btn-sm">
+        <span>🐙 تحميل أحدث APK</span>
       </a>
       <a href="/VisaAutoAuth-v1.0.apk" class="btn btn-outline btn-sm" download>
-        <span>📥 تحميل محلي v1.2.7</span>
+        <span>📥 تحميل محلي</span>
       </a>
       <button class="btn btn-outline btn-sm" onclick="fetchClients(true)">
         <span id="refresh-icon">🔄</span>
@@ -1240,6 +1243,80 @@
             <span>سحب لأسفل</span>
           </button>
         </div>
+      </div>
+    </div>
+  <!-- Defensive Notification Modal (نافذة إرسال الإشعارات والتنبيهات الدفاعية) -->
+  <div class="modal-overlay" id="notify-modal" onclick="closeNotificationModal(event)">
+    <div class="modal-content" style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 24px; max-width: 580px; width: 92%; box-shadow: 0 25px 60px rgba(0,0,0,0.85); backdrop-filter: blur(20px);" onclick="event.stopPropagation()">
+      <button class="modal-close" onclick="closeNotificationModalDirect()">✕</button>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:16px; width:100%;">
+        <div style="width:44px; height:44px; border-radius:12px; background:linear-gradient(135deg, #f59e0b, #ef4444); display:flex; align-items:center; justify-content:center; font-size:24px; box-shadow:0 0 15px rgba(245,158,11,0.4);">📢</div>
+        <div>
+          <h2 style="font-size:18px; font-weight:800; color:#f8fafc;" id="notify-modal-title">إرسال تنبيه دفاعي للهواتف</h2>
+          <p style="font-size:12px; color:#94a3b8;" id="notify-modal-subtitle">إيقاظ الشاشة، تشغيل الاهتزاز، وإرسال إشعار فوري عائم</p>
+        </div>
+      </div>
+
+      <!-- Target Badge -->
+      <div style="width:100%; padding:10px 14px; background:rgba(30, 41, 59, 0.7); border:1px solid rgba(255,255,255,0.08); border-radius:12px; margin-bottom:16px; display:flex; align-items:center; justify-content:space-between;">
+        <span style="font-size:12.5px; color:#94a3b8;">الوجهة والمستلم:</span>
+        <span id="notify-target-badge" style="font-size:12.5px; font-weight:700; color:#38bdf8; font-family:'JetBrains Mono', monospace;">🌐 جميع الهواتف المتصلة</span>
+      </div>
+
+      <!-- Presets -->
+      <div style="width:100%; margin-bottom:14px;">
+        <label style="font-size:12px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:6px;">⚡ قوالب رسائل دفاعية سريعة:</label>
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px;">
+          <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:6px 8px; justify-content:flex-start;" onclick="applyNotifyPreset('pre_strike')">
+            <span>🚨 اقتراب موعد الصيد</span>
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:6px 8px; justify-content:flex-start;" onclick="applyNotifyPreset('quick_check')">
+            <span>⚡ فحص مواعيد جاري</span>
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:6px 8px; justify-content:flex-start;" onclick="applyNotifyPreset('battery')">
+            <span>🔋 تنبيه شحن البطارية</span>
+          </button>
+          <button type="button" class="btn btn-outline btn-sm" style="font-size:11px; padding:6px 8px; justify-content:flex-start;" onclick="applyNotifyPreset('update')">
+            <span>🔄 تحديث التطبيق</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Form Inputs -->
+      <div style="width:100%; display:flex; flex-direction:column; gap:12px; margin-bottom:16px;">
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:4px;">عنوان الإشعار:</label>
+          <input type="text" id="notify-input-title" class="studio-text-input" style="width:100%; padding:9px 12px; font-size:13px;" value="🚨 تنبيه هام: اقترب موعد صيد التأشيرة!">
+        </div>
+        <div>
+          <label style="font-size:12px; font-weight:700; color:#cbd5e1; display:block; margin-bottom:4px;">نص الإشعار والرسالة:</label>
+          <textarea id="notify-input-message" class="studio-text-input" style="width:100%; min-height:75px; padding:9px 12px; font-size:12.5px; resize:vertical; font-family:inherit;">يرجى فتح شاشة هاتفك الآن وتركها نشطة ومضاءة! الدورة تبدأ خلال لحظات ولن نتمكن من تأكيد الرمز إذا كانت الشاشة مغلقة.</textarea>
+        </div>
+      </div>
+
+      <!-- Defense Flags -->
+      <div style="width:100%; display:flex; gap:16px; flex-wrap:wrap; margin-bottom:18px; padding:10px 14px; background:rgba(30, 41, 59, 0.5); border-radius:12px;">
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="notify-opt-wake" checked>
+          <span>💡 إيقاظ شاشة الهاتف</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="notify-opt-vibrate" checked>
+          <span>📳 اهتزاز تنبيهي قوي</span>
+        </label>
+        <label style="display:flex; align-items:center; gap:6px; font-size:12px; cursor:pointer;">
+          <input type="checkbox" id="notify-opt-banner" checked>
+          <span>📌 إشعار عائم بأعلى أولوية</span>
+        </label>
+      </div>
+
+      <!-- Actions -->
+      <div style="width:100%; display:flex; gap:10px; justify-content:flex-end;">
+        <button type="button" class="btn btn-outline btn-sm" onclick="closeNotificationModalDirect()">إلغاء</button>
+        <button type="button" class="btn btn-warning btn-sm" id="notify-send-btn" onclick="sendDefensiveNotification()" style="padding:9px 24px; font-size:13px; background:linear-gradient(135deg, #f59e0b, #d97706); border:none; box-shadow:0 0 15px rgba(245,158,11,0.5);">
+          <span>🚀 إرسال التنبيه الآن</span>
+        </button>
       </div>
     </div>
   </div>
@@ -1526,6 +1603,9 @@
                 </button>
                 <button class="btn btn-outline btn-sm" onclick="triggerRemote('${escapeHtml(client.email)}', 'vibrate', this)" ${!isOnline ? 'disabled title="الهاتف غير متصل"' : ''} title="رنين واهتزاز تنبيهي">
                   <span>📳</span>
+                </button>
+                <button class="btn btn-warning btn-sm" style="flex:0; padding:6px 10px; background: rgba(245, 158, 11, 0.2); border-color: rgba(245, 158, 11, 0.5); color: #fbbf24;" onclick="openIndividualNotifyModal('${escapeHtml(client.email)}')" ${!isOnline ? 'disabled title="الهاتف غير متصل"' : ''} title="إرسال إشعار وتنبيه دفاعي خاص بهذا الهاتف">
+                  <span>🔔</span>
                 </button>
                 <button class="btn btn-outline btn-sm" style="flex:0; padding:6px 10px;" onclick="copyClientConfig('${escapeHtml(client.email)}')" title="نسخ بيانات الإعداد للعميل">
                   <span>📋</span>
@@ -2196,6 +2276,112 @@
 
     function filterClients() {
       renderClients();
+    }
+
+    // Defensive Notification Modal Controller
+    let notifyTargetEmail = null;
+
+    function openBroadcastModal() {
+      notifyTargetEmail = null;
+      document.getElementById('notify-modal-title').textContent = '📢 إرسال تنبيه دفاعي جماعي';
+      document.getElementById('notify-modal-subtitle').textContent = 'إيقاظ جميع الهواتف المتصلة دفعة واحدة وعرض إشعار تنبيهي واهتزاز';
+      const onlineCount = allClients.filter(c => c.online).length;
+      document.getElementById('notify-target-badge').textContent = `🌐 جميع الهواتف المتصلة (${onlineCount} هاتف نشط حالياً)`;
+      applyNotifyPreset('pre_strike');
+      document.getElementById('notify-modal').classList.add('active');
+    }
+
+    function openIndividualNotifyModal(email) {
+      notifyTargetEmail = email;
+      document.getElementById('notify-modal-title').textContent = '🔔 إرسال تنبيه خاص للهاتف';
+      document.getElementById('notify-modal-subtitle').textContent = `إرسال إشعار واهتزاز مخصص لهاتف العميل: ${email}`;
+      document.getElementById('notify-target-badge').textContent = `📱 ${email}`;
+      applyNotifyPreset('pre_strike');
+      document.getElementById('notify-modal').classList.add('active');
+    }
+
+    function closeNotificationModal(e) {
+      if (e.target.id === 'notify-modal') {
+        closeNotificationModalDirect();
+      }
+    }
+
+    function closeNotificationModalDirect() {
+      document.getElementById('notify-modal').classList.remove('active');
+    }
+
+    const NOTIFY_PRESETS = {
+      pre_strike: {
+        title: '🚨 اقتراب موعد صيد التأشيرة!',
+        message: 'يرجى فتح شاشة هاتفك الآن وتركها نشطة ومضاءة! الدورة تبدأ خلال 60 ثانية ولن نتمكن من تأكيد الرمز إذا كانت الشاشة مغلقة.'
+      },
+      quick_check: {
+        title: '⚡ فحص فوري للمواعيد!',
+        message: 'جاري فحص المواعيد الآن، يرجى إبقاء شاشة الهاتف مفتوحة وعدم لمس الشاشة أثناء حل رمز التحقق.'
+      },
+      battery: {
+        title: '🔋 تنبيه طاقة وشحن الهاتف!',
+        message: 'بطارية هاتفك منخفضة! يرجى توصيل الهاتف بالشاحن الكهربائي والتأكد من استقرار الإنترنت لضمان الصيد.'
+      },
+      update: {
+        title: '🔄 تحديث جديد متوفر للتطبيق!',
+        message: 'يتوفر تحديث جديد لتطبيق مساعد المافيفا v1.7.1 لحل مشكلات الإغلاق التلقائي، يرجى فتح التطبيق وتحديثه الآن.'
+      }
+    };
+
+    function applyNotifyPreset(key) {
+      const p = NOTIFY_PRESETS[key];
+      if (!p) return;
+      document.getElementById('notify-input-title').value = p.title;
+      document.getElementById('notify-input-message').value = p.message;
+    }
+
+    async function sendDefensiveNotification() {
+      const btn = document.getElementById('notify-send-btn');
+      const title = document.getElementById('notify-input-title').value.trim();
+      const message = document.getElementById('notify-input-message').value.trim();
+      const wakeScreen = document.getElementById('notify-opt-wake').checked;
+      const vibrate = document.getElementById('notify-opt-vibrate').checked;
+
+      if (!title || !message) {
+        showToast('⚠️ يرجى كتابة عنوان ورسالة الإشعار');
+        return;
+      }
+
+      const origHtml = btn.innerHTML;
+      btn.innerHTML = '<span>⏳ جاري الإرسال...</span>';
+      btn.disabled = true;
+
+      try {
+        let url = '/api/client-app/broadcast-notification';
+        if (notifyTargetEmail) {
+          url = `/api/client-app/send-notification/${encodeURIComponent(notifyTargetEmail)}`;
+        }
+
+        const res = await fetch(url, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, message, wakeScreen, vibrate })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          if (notifyTargetEmail) {
+            showToast(`✅ تم تسليم الإشعار والتنبيه بنجاح لهاتف: ${notifyTargetEmail}`);
+          } else {
+            showToast(`✅ تم إرسال الإشعار الدفاعي الجماعي بنجاح إلى ${data.totalOnline || 0} هاتف متصل!`);
+          }
+          closeNotificationModalDirect();
+          fetchClients();
+        } else {
+          showToast('❌ تعذر تسليم الإشعار: ' + (data.error || 'خطأ غير معروف'));
+        }
+      } catch (err) {
+        showToast('❌ خطأ في الاتصال بالسيرفر: ' + err.message);
+      } finally {
+        btn.innerHTML = origHtml;
+        btn.disabled = false;
+      }
     }
 
     // Initial load

@@ -8,6 +8,9 @@ import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.app.KeyguardManager;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
+import android.widget.Toast;
 import android.graphics.Bitmap;
 import android.graphics.Path;
 import android.graphics.Rect;
@@ -260,6 +263,60 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 } catch (Exception e) {
                                     sendAck(cleanUrl, email, "REMOTE", false, "تعذر تشغيل الاهتزاز: " + e.getMessage());
                                 }
+                            } else if ("SHOW_NOTIFICATION".equals(action)) {
+                                Log.i(TAG, "Server requested defensive notification");
+                                wakeScreenAndDismissKeyguard();
+                                String title = json.optString("title", "🚨 تنبيه دفاعي من منظومة الصيد");
+                                String message = json.optString("message", "يرجى ترك شاشة الهاتف نشطة وغير مقفلة");
+                                boolean vibrate = json.optBoolean("vibrate", true);
+
+                                if (vibrate) {
+                                    try {
+                                        Vibrator v = (Vibrator) getSystemService(Context.VIBRATOR_SERVICE);
+                                        if (v != null && v.hasVibrator()) {
+                                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                                v.vibrate(VibrationEffect.createWaveform(new long[]{0, 400, 150, 400, 150, 600}, -1));
+                                            } else {
+                                                v.vibrate(800);
+                                            }
+                                        }
+                                    } catch (Exception ignored) {}
+                                }
+
+                                try {
+                                    NotificationManager nm = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+                                    if (nm != null) {
+                                        String channelId = "visa_hunter_defense_channel";
+                                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                                            NotificationChannel channel = new NotificationChannel(
+                                                channelId,
+                                                "إشعارات الدفاع والتنبيهات الحية",
+                                                NotificationManager.IMPORTANCE_HIGH
+                                            );
+                                            channel.setDescription("تنبيهات فورية وإشعارات حية لمنظومة صيد التأشيرات");
+                                            channel.enableVibration(true);
+                                            channel.enableLights(true);
+                                            nm.createNotificationChannel(channel);
+                                        }
+
+                                        androidx.core.app.NotificationCompat.Builder builder = new androidx.core.app.NotificationCompat.Builder(this, channelId)
+                                            .setSmallIcon(R.mipmap.ic_launcher)
+                                            .setContentTitle(title)
+                                            .setContentText(message)
+                                            .setStyle(new androidx.core.app.NotificationCompat.BigTextStyle().bigText(message))
+                                            .setPriority(androidx.core.app.NotificationCompat.PRIORITY_MAX)
+                                            .setCategory(androidx.core.app.NotificationCompat.CATEGORY_ALARM)
+                                            .setAutoCancel(true);
+
+                                        nm.notify(1002, builder.build());
+                                    }
+                                } catch (Exception ex) {
+                                    Log.e(TAG, "Notification show error: " + ex.getMessage());
+                                }
+
+                                handler.post(() -> Toast.makeText(getApplicationContext(), title + "\n" + message, Toast.LENGTH_LONG).show());
+                                updateState(true, "📢 " + message);
+                                sendAck(cleanUrl, email, "NOTIFICATION", true, "تم استلام وعرض الإشعار: " + message);
                             } else if ("START_LIVE_STREAM".equals(action)) {
                                 Log.i(TAG, "Server requested start live stream");
                                 wakeScreenIfNeeded();

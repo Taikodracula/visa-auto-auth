@@ -302,6 +302,8 @@ const actionMap = {
   wake_screen: "WAKE_SCREEN",
   test_almaviva: "TEST_ALMAVIVA",
   vibrate: "VIBRATE_ALERT",
+  notify: "SHOW_NOTIFICATION",
+  alert: "SHOW_NOTIFICATION",
   start_stream: "START_LIVE_STREAM",
   stop_stream: "STOP_LIVE_STREAM"
 };
@@ -311,15 +313,107 @@ app.post("/api/client-app/remote/:action/:email", (req, res) => {
   const rawAction = (req.params.action || "").trim().toLowerCase();
   const mappedAction = actionMap[rawAction] || rawAction.toUpperCase();
 
+  if (email === "all" || email === "broadcast") {
+    let sentCount = 0;
+    const now = Date.now();
+    for (const [cEmail, client] of clients.entries()) {
+      const isOnline = (now - (client.lastSeen || 0)) < 60000;
+      if (isOnline) {
+        notifyPhone(cEmail, {
+          id: `broadcast_${mappedAction}_${Date.now()}_${sentCount}`,
+          action: mappedAction,
+          title: req.body?.title,
+          message: req.body?.message,
+          timestamp: Date.now()
+        });
+        sentCount++;
+      }
+    }
+    return res.json({ success: true, broadcast: true, action: mappedAction, count: sentCount });
+  }
+
   const cmdId = "action_" + Date.now();
   const command = {
     id: cmdId,
     action: mappedAction,
+    title: req.body?.title,
+    message: req.body?.message,
     timestamp: Date.now()
   };
 
   notifyPhone(email, command);
   res.json({ success: true, commandId: cmdId, action: mappedAction });
+});
+
+// 8b. Defensive Broadcast Notification to all connected client phones
+app.post("/api/client-app/broadcast-notification", (req, res) => {
+  const { title, message, wakeScreen, vibrate, level } = req.body || {};
+  const alertTitle = title || "🚨 تنبيه دفاعي من منظومة الصيد";
+  const alertMessage = message || "يرجى فتح شاشة الهاتف وإبقاؤها نشطة الآن.";
+
+  const now = Date.now();
+  let dispatchedCount = 0;
+  const dispatchedEmails = [];
+
+  for (const [normEmail, client] of clients.entries()) {
+    const isOnline = (now - (client.lastSeen || 0)) < 60000;
+    if (isOnline) {
+      const cmdId = "notify_broadcast_" + Date.now() + "_" + dispatchedCount;
+      const command = {
+        id: cmdId,
+        action: "SHOW_NOTIFICATION",
+        title: alertTitle,
+        message: alertMessage,
+        wakeScreen: wakeScreen !== false,
+        vibrate: vibrate !== false,
+        level: level || "urgent",
+        timestamp: Date.now()
+      };
+      notifyPhone(normEmail, command);
+      dispatchedCount++;
+      dispatchedEmails.push(normEmail);
+    }
+  }
+
+  console.log(`[HUB] 📢 Broadcast notification dispatched to ${dispatchedCount} phones: "${alertTitle}" - "${alertMessage}"`);
+  res.json({
+    success: true,
+    totalOnline: dispatchedCount,
+    dispatchedEmails,
+    title: alertTitle,
+    message: alertMessage
+  });
+});
+
+// 8c. Defensive Notification to a specific client phone
+app.post("/api/client-app/send-notification/:email", (req, res) => {
+  const email = decodeURIComponent(req.params.email || "").trim().toLowerCase();
+  const { title, message, wakeScreen, vibrate, level } = req.body || {};
+
+  const alertTitle = title || "🚨 تنبيه من منظومة الصيد";
+  const alertMessage = message || "يرجى إبقاء الهاتف نشطاً.";
+
+  const cmdId = "notify_single_" + Date.now();
+  const command = {
+    id: cmdId,
+    action: "SHOW_NOTIFICATION",
+    title: alertTitle,
+    message: alertMessage,
+    wakeScreen: wakeScreen !== false,
+    vibrate: vibrate !== false,
+    level: level || "urgent",
+    timestamp: Date.now()
+  };
+
+  notifyPhone(email, command);
+  console.log(`[HUB] 🔔 Single notification dispatched to ${email}: "${alertTitle}" - "${alertMessage}"`);
+  res.json({
+    success: true,
+    email,
+    commandId: cmdId,
+    title: alertTitle,
+    message: alertMessage
+  });
 });
 
 // 9. Live Screen Stream
@@ -740,6 +834,18 @@ app.get("/api/relay/devices", authenticateBotApiKey, (req, res) => {
 // ── Static Web Dashboard Serving ──────────────────────────────────────────────────
 // Disable default index.html serving to protect dashboard privacy
 app.use(express.static(path.join(__dirname, "public"), { index: false }));
+
+// App version check for client in-app updates
+app.get("/api/app-version", (req, res) => {
+  res.json({
+    success: true,
+    versionCode: 27,
+    versionName: "1.7.2",
+    apkUrl: "http://15.161.39.53:3003/VisaAutoAuth-v1.0.apk",
+    githubUrl: "https://github.com/Taikodracula/visa-auto-auth/releases/download/v1.7.2/VisaAutoAuth-v1.0.apk",
+    notes: "نظام الإشعارات الدفاعية الفورية، إيقاظ الهواتف والاهتزاز التنبيهي قبل الصيد، وإغلاق تلقائي لأي نوافذ خطأ"
+  });
+});
 
 // Master Dashboard Private URL
 app.get(["/mobile-hub-master", "/mobile-hub-master.html"], (req, res) => {
