@@ -891,11 +891,11 @@ app.use(express.static(path.join(__dirname, "public"), { index: false }));
 app.get("/api/app-version", (req, res) => {
   res.json({
     success: true,
-    versionCode: 27,
-    versionName: "1.7.2",
-    apkUrl: "http://15.161.39.53:3003/VisaAutoAuth-v1.0.apk",
-    githubUrl: "https://github.com/Taikodracula/visa-auto-auth/releases/download/v1.7.2/VisaAutoAuth-v1.0.apk",
-    notes: "نظام الإشعارات الدفاعية الفورية، إيقاظ الهواتف والاهتزاز التنبيهي قبل الصيد، وإغلاق تلقائي لأي نوافذ خطأ"
+    versionCode: 28,
+    versionName: "1.7.3",
+    apkUrl: "https://github.com/Taikodracula/visa-auto-auth/releases/download/v1.7.3/VisaAutoAuth-v1.0.apk",
+    githubUrl: "https://github.com/Taikodracula/visa-auto-auth/releases/download/v1.7.3/VisaAutoAuth-v1.0.apk",
+    notes: "حل نهائي لمشكلة فتح وغلق نافذة التأكيد، النقر الفوري التلقائي على زر تأكيد، وتثبيت التوقيع الرقمي لمنع تعارض الحزم"
   });
 });
 
