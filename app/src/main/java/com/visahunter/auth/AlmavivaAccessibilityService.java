@@ -183,8 +183,8 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                                 long timestamp = json.optLong("timestamp", 0);
                                 long nowMs = System.currentTimeMillis();
 
-                                // 🛡️ Drop stale / expired challenge if older than 25 seconds
-                                if (timestamp > 0 && (nowMs - timestamp) > 25000) {
+                                // 🛡️ Drop stale / expired challenge if older than 20 seconds
+                                if (timestamp > 0 && (nowMs - timestamp) > 20000) {
                                     long ageSec = (nowMs - timestamp) / 1000;
                                     Log.w(TAG, "⚠️ [STALE CHALLENGE] Dropping expired challenge (" + ageSec + "s old): " + challengeId);
                                     updateState(true, "⚠️ تم تجاهل شالنج منتهي الصلاحية (" + ageSec + " ثانية مضت)");
@@ -419,6 +419,13 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         }
 
         try {
+            // 🛡️ Auto-Dismiss any leftover error dialogs ("غلق", "إغلاق", "Close", "Chiudi")
+            if (findAndClickSmart(root, true, "غلق", "إغلاق", "Close", "Chiudi")) {
+                Log.i(TAG, "🛡️ [AUTO-DISMISS] Dismissed leftover error dialog popup!");
+                handler.postDelayed(stepLoopRunnable, 600);
+                return;
+            }
+
             boolean stepSuccess = false;
             switch (currentStep) {
                 case 1:
