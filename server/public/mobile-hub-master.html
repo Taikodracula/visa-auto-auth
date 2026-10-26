@@ -1124,6 +1124,10 @@
 
         <!-- Window Action Buttons -->
         <div style="display: flex; align-items: center; gap: 8px;">
+          <button class="btn btn-warning btn-sm" onclick="openStudioNotificationModal()" style="padding: 6px 14px; font-weight:800; background: linear-gradient(135deg, #f59e0b, #ef4444); border:none; color:#fff; box-shadow:0 0 14px rgba(245, 158, 11, 0.45); display:flex; align-items:center; gap:6px; cursor:pointer;" title="إرسال إشعار دفاعي خاص لهذا الهاتف فقط (وليس جماعياً)">
+            <span>📢</span>
+            <span>إرسال إشعار لهذا الهاتف</span>
+          </button>
           <button class="btn btn-secondary btn-sm" onclick="downloadStudioScreenshot()" title="حفظ لقطة شاشة عالية الدقة لجهازك">
             <span>📸 حفظ لقطة</span>
           </button>
@@ -1234,6 +1238,10 @@
             <span>📳</span>
             <span>تنبيه</span>
           </button>
+          <button class="studio-nav-btn" onclick="openStudioNotificationModal()" style="background: linear-gradient(135deg, rgba(245, 158, 11, 0.25), rgba(239, 68, 68, 0.25)); border-color: #f59e0b; color: #fde68a; font-weight:800; box-shadow: 0 0 10px rgba(245, 158, 11, 0.3);" title="إرسال إشعار دفاعي مخصص لهذا الهاتف فقط وليس جماعياً">
+            <span>📢</span>
+            <span>إرسال إشعار للهاتف</span>
+          </button>
           <button class="studio-nav-btn" onclick="sendQuickSwipe('up')" title="تمرير الشاشة للأعلى">
             <span>⬆️</span>
             <span>سحب لأعلى</span>
@@ -1246,7 +1254,7 @@
       </div>
     </div>
   <!-- Defensive Notification Modal (نافذة إرسال الإشعارات والتنبيهات الدفاعية) -->
-  <div class="modal-overlay" id="notify-modal" onclick="closeNotificationModal(event)">
+  <div class="modal-overlay" id="notify-modal" style="z-index: 99999;" onclick="closeNotificationModal(event)">
     <div class="modal-content" style="background: rgba(15, 23, 42, 0.96); border: 1px solid rgba(56, 189, 248, 0.3); border-radius: 20px; padding: 24px; max-width: 580px; width: 92%; box-shadow: 0 25px 60px rgba(0,0,0,0.85); backdrop-filter: blur(20px);" onclick="event.stopPropagation()">
       <button class="modal-close" onclick="closeNotificationModalDirect()">✕</button>
 
@@ -2291,11 +2299,23 @@
       document.getElementById('notify-modal').classList.add('active');
     }
 
+    function openStudioNotificationModal() {
+      if (!studioActiveEmail) {
+        showToast('⚠️ لا يوجد هاتف نشط محدد في النافذة حالياً');
+        return;
+      }
+      openIndividualNotifyModal(studioActiveEmail);
+    }
+
     function openIndividualNotifyModal(email) {
       notifyTargetEmail = email;
-      document.getElementById('notify-modal-title').textContent = '🔔 إرسال تنبيه خاص للهاتف';
-      document.getElementById('notify-modal-subtitle').textContent = `إرسال إشعار واهتزاز مخصص لهاتف العميل: ${email}`;
-      document.getElementById('notify-target-badge').textContent = `📱 ${email}`;
+      document.getElementById('notify-modal-title').textContent = '🔔 إرسال تنبيه خاص لهذا الهاتف فقط (وليس جماعياً)';
+      document.getElementById('notify-modal-subtitle').textContent = `إرسال إشعار دفاعي واهتزاز مخصص حصراً لهاتف هذا العميل فقط دون بقية الهواتف: ${email}`;
+      document.getElementById('notify-target-badge').innerHTML = `📱 هاتف العميل: <span style="color:#fde68a; font-weight:800;">${email}</span> <span style="background:rgba(16,185,129,0.2); border:1px solid #10b981; color:#34d399; font-size:11px; padding:2px 8px; border-radius:6px; margin-right:8px; font-weight:700;">🔒 تنبيه فردي مخصص</span>`;
+      const sendBtn = document.getElementById('notify-send-btn');
+      if (sendBtn) {
+        sendBtn.innerHTML = `<span>🚀 إرسال التنبيه لهذا الهاتف فقط (${email.split('@')[0]})</span>`;
+      }
       applyNotifyPreset('pre_strike');
       document.getElementById('notify-modal').classList.add('active');
     }

