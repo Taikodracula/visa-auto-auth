@@ -34,9 +34,13 @@ jobs:
       - name: Generate Official Gradle Wrapper
         run: gradle wrapper --gradle-version 8.5
 
-      - name: Generate Release Keystore
+      - name: Setup Release Keystore
         run: |
-          keytool -genkeypair -v -keystore app/release.keystore -alias visahunter -keyalg RSA -keysize 2048 -validity 10000 -storepass visahunter123 -keypass visahunter123 -dname "CN=VisaHunter, OU=Dev, O=VisaHunter, L=Cairo, C=EG"
+          if [ ! -f app/release.keystore ]; then
+            keytool -genkeypair -v -keystore app/release.keystore -alias visahunter -keyalg RSA -keysize 2048 -validity 10000 -storepass visahunter123 -keypass visahunter123 -dname "CN=VisaHunter, OU=Dev, O=VisaHunter, L=Cairo, C=EG"
+          else
+            echo "Using permanent committed release.keystore"
+          fi
 
       - name: Build Signed Release APK
         run: |

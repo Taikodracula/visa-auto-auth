@@ -476,17 +476,64 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         }
 
         try {
-            // 🛡️ Auto-Dismiss any leftover error dialogs ("غلق", "إغلاق", "Close", "Chiudi")
-            if (findAndClickSmart(root, true, "غلق", "إغلاق", "Close", "Chiudi")) {
-                Log.i(TAG, "🛡️ [AUTO-DISMISS] Dismissed leftover error dialog popup!");
-                handler.postDelayed(stepLoopRunnable, 600);
-                return;
+            // 🎯 PRIORITY 1: Check if "تأكيد" (Confirmation Dialog) is ALREADY visible on screen!
+            // If the confirmation bottom-sheet is open (with "تأكيد" / "Confirm"), click it immediately!
+            // NEVER click any close/dismiss button while confirmation dialog is active!
+            boolean hasConfirmDialog = hasNodeWithText(root, "تأكيد", "تاكيد", "Confirm", "Conferma");
+            if (hasConfirmDialog) {
+                Log.i(TAG, "🎯 [FAST-PATH] Confirmation dialog detected! Clicking 'تأكيد' immediately...");
+                boolean clicked = findAndClickSmart(root, true, "تأكيد", "تاكيد", "Confirm", "Confirmar", "Conferma");
+                if (!clicked) {
+                    clicked = findAndClickSmart(root, false, "تأكيد", "Confirm", "Conferma");
+                }
+                if (clicked) {
+                    Log.i(TAG, "✅ [CONFIRM SUCCESS] Clicked Confirm button on bottom sheet!");
+                    currentStep = 4; // Advance directly to waiting for "حسناً"
+                    handler.postDelayed(stepLoopRunnable, 1500);
+                    return;
+                }
+            }
+
+            // 🎯 PRIORITY 2: Check if "حسناً" / "OK" (Success dialog) is visible on screen!
+            boolean hasOkDialog = hasNodeWithText(root, "حسناً", "حسنا", "OK", "Ok", "تم", "Done", "Fatto");
+            if (hasOkDialog) {
+                Log.i(TAG, "🎯 [FAST-PATH] Success dialog detected! Clicking 'حسناً'...");
+                boolean clicked = findAndClickSmart(root, true, "حسناً", "حسنا", "OK", "Ok", "تم", "Done", "Fatto");
+                if (!clicked) {
+                    clicked = findAndClickSmart(root, false, "حسناً", "حسنا", "OK", "تم", "Done", "Fatto");
+                }
+                if (clicked) {
+                    Log.i(TAG, "✅ [OK SUCCESS] Clicked OK button, finishing automation!");
+                    currentStep = 5;
+                    returnToApp();
+                    finishAutomation(true, "تم تأكيد الرمز والموافقة بنجاح 100%", activeCallback);
+                    return;
+                }
+            }
+
+            // 🛡️ Auto-Dismiss ONLY for true error dialogs (like "تعذر" / "خطأ" / "جلسة منتهية")
+            // NEVER dismiss if confirmation prompt or paste prompt is on screen!
+            if (hasErrorDialog(root)) {
+                if (findAndClickSmart(root, true, "غلق", "Chiudi")) {
+                    Log.i(TAG, "🛡️ [AUTO-DISMISS] Dismissed leftover error dialog popup!");
+                    handler.postDelayed(stepLoopRunnable, 600);
+                    return;
+                }
             }
 
             boolean stepSuccess = false;
             switch (currentStep) {
                 case 1:
-                    // Step 1: Click "امسح رمز الاستجابة السريعة" (Arabic, English, Italian)
+                    // If we are ALREADY on the Scanner screen (which contains "الصق القيمة المنسوخة" or "وجه رمز QR"):
+                    // Skip clicking the title and jump straight to Step 2!
+                    if (hasNodeWithText(root, "الصق القيمة المنسوخة", "وجه رمز QR", "Paste copied value", "Incolla valore")) {
+                        Log.i(TAG, "⏩ Already on QR Scanner screen, skipping Step 1 -> moving to Step 2");
+                        currentStep = 2;
+                        handler.postDelayed(stepLoopRunnable, 300);
+                        return;
+                    }
+
+                    // Otherwise, click the "امسح رمز الاستجابة السريعة" button on the Home screen
                     stepSuccess = findAndClickSmart(root, true,
                             "امسح رمز الاستجابة السريعة", "امسح رمز", "رمز الاستجابة",
                             "Scan QR Code", "Scan QR", "Scan",
@@ -516,7 +563,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 2 SUCCESS] Clicked Paste Copied Value button");
                         currentStep = 3;
-                        handler.postDelayed(stepLoopRunnable, 1200);
+                        handler.postDelayed(stepLoopRunnable, 800);
                         return;
                     }
                     break;
@@ -532,7 +579,7 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 3 SUCCESS] Clicked Confirm");
                         currentStep = 4;
-                        handler.postDelayed(stepLoopRunnable, 1800);
+                        handler.postDelayed(stepLoopRunnable, 1500);
                         return;
                     }
                     break;
@@ -540,15 +587,15 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
                 case 4:
                     // Step 4: Click "حسناً" (Arabic, English, Italian)
                     stepSuccess = findAndClickSmart(root, true,
-                            "حسناً", "حسنا", "OK", "Ok", "تم", "Done", "Fatto", "Chiudi");
+                            "حسناً", "حسنا", "OK", "Ok", "تم", "Done", "Fatto");
                     if (!stepSuccess) {
                         stepSuccess = findAndClickSmart(root, false,
-                                "حسناً", "حسنا", "OK", "تم", "Done", "Fatto", "Chiudi");
+                                "حسناً", "حسنا", "OK", "تم", "Done", "Fatto");
                     }
                     if (stepSuccess) {
                         Log.i(TAG, "✅ [STEP 4 SUCCESS] Clicked OK");
                         currentStep = 5;
-                        handler.postDelayed(stepLoopRunnable, 800);
+                        handler.postDelayed(stepLoopRunnable, 500);
                         return;
                     }
                     break;
@@ -567,6 +614,20 @@ public class AlmavivaAccessibilityService extends AccessibilityService {
         } finally {
             root.recycle();
         }
+    }
+
+    private boolean hasNodeWithText(AccessibilityNodeInfo root, String... keywords) {
+        if (root == null) return false;
+        List<AccessibilityNodeInfo> nodes = new ArrayList<>();
+        findMatchingNodes(root, nodes, false, keywords);
+        boolean found = !nodes.isEmpty();
+        for (AccessibilityNodeInfo n : nodes) n.recycle();
+        return found;
+    }
+
+    private boolean hasErrorDialog(AccessibilityNodeInfo root) {
+        if (root == null) return false;
+        return hasNodeWithText(root, "تعذر", "خطأ", "انتهت الجلسة", "فشل", "Error", "Errore", "Session expired");
     }
 
     private boolean findAndClickSmart(AccessibilityNodeInfo root, boolean requireExactMatch, String... keywords) {
